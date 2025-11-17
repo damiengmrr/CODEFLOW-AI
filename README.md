@@ -12,6 +12,12 @@
 # 🚀 CodeFlow AI — Version Bêta
 
 ![CodeFlow Logo](./frontend/public/images/codeflow-logo.png)
+<p align="left">
+  <img src="https://img.shields.io/badge/version-Beta_0.1-blueviolet?style=flat-square" />
+  <img src="https://img.shields.io/badge/Build-Passing-brightgreen?style=flat-square" />
+  <img src="https://img.shields.io/badge/Status-Active_Development-orange?style=flat-square" />
+  <img src="https://img.shields.io/badge/Powered_by-Groq_AI-blue?style=flat-square" />
+</p>
 
 CodeFlow AI est un projet en **version bêta avancée**, conçu pour devenir l’un des générateurs de projets les plus complets et intuitifs du marché.  
 Son but : transformer une simple phrase en une architecture backend ou full‑stack complète, propre, maintenable et prête à être lancée.
