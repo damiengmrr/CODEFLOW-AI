@@ -81,6 +81,8 @@
 //     setLoading(true);
 //     setError("");
 //     setResult(null);
+//     setSelectedFile(null);
+//     setShowRawResult(false);
 
 //     try {
 //       const response = await fetch("http://localhost:4000/api/generate", {
@@ -107,7 +109,6 @@
 //         files: data.files || [],
 //       };
 //       setHistory((prev) => [entry, ...prev].slice(0, 10));
-//       setSelectedFile(null);
 //     } catch (err) {
 //       console.error(err);
 //       setError(err.message || "Erreur inconnue");
@@ -118,519 +119,869 @@
 
 //   const plan = result?.plan;
 //   const files = result?.files || [];
+//   const recentHistory = history.slice(0, 5);
+
+//   const planSummary =
+//     plan && `${plan.entities?.length || 0} entités · ${
+//       plan.routes?.length || 0
+//     } groupes de routes · ${files.length} fichiers`;
 
 //   return (
 //     <div
 //       style={{
 //         minHeight: "100vh",
-//         background: "#050509",
+//         background:
+//           "radial-gradient(circle at top, #0b1120 0, #020617 45%, #000 100%)",
 //         color: "white",
 //         fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
 //       }}
 //     >
+//       {/* HEADER */}
 //       <header
 //         style={{
-//           padding: "1.5rem 2.5rem",
-//           borderBottom: "1px solid rgba(255,255,255,0.05)",
+//           padding: "1rem 1.5rem",
+//           borderBottom: "1px solid rgba(148,163,184,0.25)",
 //           display: "flex",
 //           justifyContent: "space-between",
 //           alignItems: "center",
 //           position: "sticky",
 //           top: 0,
-//           backdropFilter: "blur(12px)",
-//           background: "linear-gradient(90deg,#050509,#090922)",
-//           zIndex: 10,
+//           backdropFilter: "blur(18px)",
+//           background:
+//             "linear-gradient(90deg, rgba(15,23,42,0.9), rgba(2,6,23,0.95))",
+//           zIndex: 20,
 //         }}
 //       >
 //         <div>
-//           <div style={{ fontSize: "0.8rem", opacity: 0.6 }}>Pridano Labs</div>
-//           <h1 style={{ margin: 0, fontSize: "1.5rem", fontWeight: 700 }}>
-//             🚀 CODEFLOW-AI — Backend Generator
+//           <div style={{ fontSize: "0.75rem", opacity: 0.6 }}>Pridano Labs</div>
+//           <h1
+//             style={{
+//               margin: 0,
+//               fontSize: "1.4rem",
+//               fontWeight: 700,
+//               letterSpacing: "0.03em",
+//             }}
+//           >
+//             🚀 CODEFLOW-AI
 //           </h1>
+//           <p
+//             style={{
+//               margin: "0.2rem 0 0",
+//               fontSize: "0.8rem",
+//               opacity: 0.75,
+//             }}
+//           >
+//             Ton IA pour générer des backends Node.js / Postgres prêts à copier.
+//           </p>
 //         </div>
-//         <span
+//         <div
 //           style={{
-//             fontSize: "0.8rem",
-//             padding: "0.3rem 0.7rem",
-//             borderRadius: "999px",
-//             border: "1px solid rgba(255,255,255,0.2)",
-//             opacity: 0.8,
+//             display: "flex",
+//             gap: "0.4rem",
+//             alignItems: "center",
 //           }}
 //         >
-//           Mode: <strong>Backend</strong>
-//         </span>
+//           <span
+//             style={{
+//               fontSize: "0.8rem",
+//               padding: "0.25rem 0.7rem",
+//               borderRadius: "999px",
+//               border: "1px solid rgba(148,163,184,0.4)",
+//               opacity: 0.9,
+//             }}
+//           >
+//             Mode : <strong>Backend</strong>
+//           </span>
+//         </div>
 //       </header>
 
+//       {/* MAIN */}
 //       <main
 //         style={{
-//           padding: "2rem 2.5rem 3rem",
-//           display: "grid",
-//           gridTemplateColumns: "minmax(0, 1.2fr) minmax(0, 1.5fr)",
-//           gap: "2rem",
+//           padding: "1.5rem 0.75rem 3rem",
+//           display: "flex",
+//           justifyContent: "center",
 //         }}
 //       >
-//         {/* Colonne gauche : zone de prompt */}
-//         <section>
-//           <h2 style={{ fontSize: "1rem", opacity: 0.8, marginBottom: "0.5rem" }}>
-//             1. Décris le backend à générer
-//           </h2>
-
-//           {/* Sélecteur de mode */}
-//           <div
+//         <div
+//           style={{
+//             width: "100%",
+//             maxWidth: "960px",
+//             display: "flex",
+//             flexDirection: "column",
+//             gap: "1.5rem",
+//           }}
+//         >
+//           {/* BLOC "CHAT" */}
+//           <section
 //             style={{
-//               display: "flex",
-//               gap: "0.5rem",
-//               marginBottom: "0.75rem",
-//               flexWrap: "wrap",
-//             }}
-//           >
-//             <button
-//               type="button"
-//               onClick={() => handleModeChange("backend-simple")}
-//               style={{
-//                 padding: "0.4rem 0.9rem",
-//                 borderRadius: "999px",
-//                 border:
-//                   mode === "backend-simple"
-//                     ? "1px solid rgba(129,140,248,0.9)"
-//                     : "1px solid rgba(148,163,184,0.4)",
-//                 background:
-//                   mode === "backend-simple"
-//                     ? "linear-gradient(135deg,#6366f1,#8b5cf6)"
-//                     : "transparent",
-//                 fontSize: "0.8rem",
-//                 fontWeight: 500,
-//                 cursor: "pointer",
-//                 color: mode === "backend-simple" ? "white" : "rgba(226,232,240,0.9)",
-//               }}
-//             >
-//               Backend simple
-//             </button>
-//             <button
-//               type="button"
-//               onClick={() => handleModeChange("full-project")}
-//               style={{
-//                 padding: "0.4rem 0.9rem",
-//                 borderRadius: "999px",
-//                 border:
-//                   mode === "full-project"
-//                     ? "1px solid rgba(129,140,248,0.9)"
-//                     : "1px solid rgba(148,163,184,0.4)",
-//                 background:
-//                   mode === "full-project"
-//                     ? "linear-gradient(135deg,#6366f1,#8b5cf6)"
-//                     : "transparent",
-//                 fontSize: "0.8rem",
-//                 fontWeight: 500,
-//                 cursor: "pointer",
-//                 color: mode === "full-project" ? "white" : "rgba(226,232,240,0.9)",
-//               }}
-//             >
-//               Projet complet
-//             </button>
-//             <button
-//               type="button"
-//               onClick={() => handleModeChange("auto-dev")}
-//               style={{
-//                 padding: "0.4rem 0.9rem",
-//                 borderRadius: "999px",
-//                 border:
-//                   mode === "auto-dev"
-//                     ? "1px solid rgba(129,140,248,0.9)"
-//                     : "1px solid rgba(148,163,184,0.4)",
-//                 background:
-//                   mode === "auto-dev"
-//                     ? "linear-gradient(135deg,#6366f1,#8b5cf6)"
-//                     : "transparent",
-//                 fontSize: "0.8rem",
-//                 fontWeight: 500,
-//                 cursor: "pointer",
-//                 color: mode === "auto-dev" ? "white" : "rgba(226,232,240,0.9)",
-//               }}
-//             >
-//               Mode auto-dev
-//             </button>
-//           </div>
-
-//           <textarea
-//             value={prompt}
-//             onChange={(e) => setPrompt(e.target.value)}
-//             rows={8}
-//             style={{
-//               width: "100%",
-//               padding: "1rem",
-//               borderRadius: "12px",
-//               border: "1px solid rgba(255,255,255,0.08)",
+//               borderRadius: "18px",
+//               border: "1px solid rgba(148,163,184,0.35)",
 //               background:
-//                 "radial-gradient(circle at top left, #1b1b2d, #050509 50%)",
-//               color: "white",
-//               resize: "vertical",
-//               fontSize: "0.95rem",
-//               boxSizing: "border-box",
-//               outline: "none",
-//             }}
-//           />
-
-//           {/* Presets rapides */}
-//           <div
-//             style={{
-//               marginTop: "0.75rem",
+//                 "linear-gradient(145deg, rgba(15,23,42,0.96), rgba(15,23,42,0.75))",
+//               boxShadow:
+//                 "0 22px 80px rgba(15,23,42,0.9), 0 0 60px rgba(59,130,246,0.25)",
+//               padding: "1.25rem 1.35rem 1rem",
 //               display: "flex",
-//               flexWrap: "wrap",
-//               gap: "0.5rem",
-//               fontSize: "0.8rem",
+//               flexDirection: "column",
+//               gap: "0.75rem",
 //             }}
 //           >
-//             <span style={{ opacity: 0.7, alignSelf: "center" }}>
-//               Presets rapides :
-//             </span>
-//             <button
-//               type="button"
-//               onClick={() =>
-//                 applyPresetPrompt(
-//                   "Génère un backend pour une API de todo list avec utilisateurs, authentification JWT et base PostgreSQL"
-//                 )
-//               }
-//               style={{
-//                 padding: "0.35rem 0.8rem",
-//                 borderRadius: "999px",
-//                 border: "1px solid rgba(148,163,184,0.5)",
-//                 background: "rgba(15,23,42,0.7)",
-//                 cursor: "pointer",
-//                 color: "rgba(226,232,240,0.95)",
-//               }}
-//             >
-//               Todo + JWT + Postgres
-//             </button>
-//             <button
-//               type="button"
-//               onClick={() =>
-//                 applyPresetPrompt(
-//                   "Génère un backend pour une API de blog avec gestion des articles, des commentaires et des utilisateurs, en Node.js + Express avec une base PostgreSQL."
-//                 )
-//               }
-//               style={{
-//                 padding: "0.35rem 0.8rem",
-//                 borderRadius: "999px",
-//                 border: "1px solid rgba(148,163,184,0.5)",
-//                 background: "rgba(15,23,42,0.7)",
-//                 cursor: "pointer",
-//                 color: "rgba(226,232,240,0.95)",
-//               }}
-//             >
-//               API Blog
-//             </button>
-//             <button
-//               type="button"
-//               onClick={() =>
-//                 applyPresetPrompt(
-//                   "Génère un backend e-commerce avec gestion des produits, des utilisateurs, des paniers et des commandes, en Node.js + Express avec PostgreSQL."
-//                 )
-//               }
-//               style={{
-//                 padding: "0.35rem 0.8rem",
-//                 borderRadius: "999px",
-//                 border: "1px solid rgba(148,163,184,0.5)",
-//                 background: "rgba(15,23,42,0.7)",
-//                 cursor: "pointer",
-//                 color: "rgba(226,232,240,0.95)",
-//               }}
-//             >
-//               API E-commerce
-//             </button>
-//             <button
-//               type="button"
-//               onClick={() =>
-//                 applyPresetPrompt(
-//                   "Tu es un expert en architectures SaaS. Génère le backend pour un SaaS d’abonnements mensuels (gestion des plans, clients, factures, rôles, webhooks de paiement, etc.) basé sur Node.js, Express et PostgreSQL."
-//                 )
-//               }
-//               style={{
-//                 padding: "0.35rem 0.8rem",
-//                 borderRadius: "999px",
-//                 border: "1px solid rgba(148,163,184,0.5)",
-//                 background: "rgba(15,23,42,0.7)",
-//                 cursor: "pointer",
-//                 color: "rgba(226,232,240,0.95)",
-//               }}
-//             >
-//               SaaS abonnements
-//             </button>
-//           </div>
-
-//           <div style={{ marginTop: "1rem", display: "flex", gap: "0.75rem" }}>
-//             <button
-//               onClick={handleGenerate}
-//               disabled={loading}
-//               style={{
-//                 padding: "0.75rem 1.5rem",
-//                 borderRadius: "999px",
-//                 border: "none",
-//                 background: loading
-//                   ? "rgba(99,102,241,0.4)"
-//                   : "linear-gradient(135deg,#6366f1,#8b5cf6)",
-//                 color: "white",
-//                 cursor: loading ? "default" : "pointer",
-//                 fontWeight: 600,
-//                 fontSize: "0.95rem",
-//                 boxShadow:
-//                   "0 10px 30px rgba(79,70,229,0.5), 0 0 20px rgba(59,130,246,0.4)",
-//                 transition: "transform 0.1s ease, box-shadow 0.1s ease",
-//               }}
-//             >
-//               {loading ? "Génération en cours..." : "Générer 🔥"}
-//             </button>
-
+//             {/* Modes (genre "system prompt") */}
 //             <div
 //               style={{
-//                 fontSize: "0.8rem",
-//                 opacity: 0.7,
-//                 alignSelf: "center",
+//                 display: "flex",
+//                 flexWrap: "wrap",
+//                 gap: "0.4rem",
+//                 marginBottom: "0.4rem",
 //               }}
 //             >
-//               Le code sera écrit dans <code>backend/generated/&lt;nom-projet&gt;</code>
+//               <button
+//                 type="button"
+//                 onClick={() => handleModeChange("backend-simple")}
+//                 style={{
+//                   padding: "0.25rem 0.8rem",
+//                   borderRadius: "999px",
+//                   border:
+//                     mode === "backend-simple"
+//                       ? "1px solid rgba(129,140,248,0.9)"
+//                       : "1px solid rgba(148,163,184,0.4)",
+//                   background:
+//                     mode === "backend-simple"
+//                       ? "linear-gradient(135deg,#6366f1,#8b5cf6)"
+//                       : "rgba(15,23,42,0.9)",
+//                   fontSize: "0.75rem",
+//                   fontWeight: 500,
+//                   cursor: "pointer",
+//                   color:
+//                     mode === "backend-simple"
+//                       ? "white"
+//                       : "rgba(226,232,240,0.9)",
+//                 }}
+//               >
+//                 Backend simple
+//               </button>
+//               <button
+//                 type="button"
+//                 onClick={() => handleModeChange("full-project")}
+//                 style={{
+//                   padding: "0.25rem 0.8rem",
+//                   borderRadius: "999px",
+//                   border:
+//                     mode === "full-project"
+//                       ? "1px solid rgba(129,140,248,0.9)"
+//                       : "1px solid rgba(148,163,184,0.4)",
+//                   background:
+//                     mode === "full-project"
+//                       ? "linear-gradient(135deg,#6366f1,#8b5cf6)"
+//                       : "rgba(15,23,42,0.9)",
+//                   fontSize: "0.75rem",
+//                   fontWeight: 500,
+//                   cursor: "pointer",
+//                   color:
+//                     mode === "full-project"
+//                       ? "white"
+//                       : "rgba(226,232,240,0.9)",
+//                 }}
+//               >
+//                 Projet complet
+//               </button>
+//               <button
+//                 type="button"
+//                 onClick={() => handleModeChange("auto-dev")}
+//                 style={{
+//                   padding: "0.25rem 0.8rem",
+//                   borderRadius: "999px",
+//                   border:
+//                     mode === "auto-dev"
+//                       ? "1px solid rgba(129,140,248,0.9)"
+//                       : "1px solid rgba(148,163,184,0.4)",
+//                   background:
+//                     mode === "auto-dev"
+//                       ? "linear-gradient(135deg,#6366f1,#8b5cf6)"
+//                       : "rgba(15,23,42,0.9)",
+//                   fontSize: "0.75rem",
+//                   fontWeight: 500,
+//                   cursor: "pointer",
+//                   color:
+//                     mode === "auto-dev" ? "white" : "rgba(226,232,240,0.9)",
+//                 }}
+//               >
+//                 Mode auto-dev
+//               </button>
 //             </div>
-//           </div>
 
-//           {error && (
-//             <p
+//             {/* "Conversation" style ChatGPT */}
+//             <div
 //               style={{
-//                 marginTop: "1rem",
-//                 color: "#f97373",
-//                 fontSize: "0.9rem",
-//                 padding: "0.75rem 1rem",
-//                 background: "rgba(127,29,29,0.3)",
-//                 borderRadius: "8px",
+//                 borderRadius: "12px",
+//                 border: "1px solid rgba(30,64,175,0.6)",
+//                 background:
+//                   "radial-gradient(circle at top left,#111827,#020617)",
+//                 padding: "0.75rem",
+//                 maxHeight: "250px",
+//                 overflow: "auto",
 //               }}
 //             >
-//               ❌ {error}
-//             </p>
-//           )}
-//         </section>
+//               {recentHistory.length === 0 && (
+//                 <p
+//                   style={{
+//                     margin: 0,
+//                     fontSize: "0.8rem",
+//                     opacity: 0.7,
+//                   }}
+//                 >
+//                   Commence par décrire le backend que tu veux et CODEFLOW-AI te
+//                   renverra un plan + des fichiers prêts à copier.
+//                 </p>
+//               )}
 
-//         {/* Colonne droite : affichage du résultat */}
-//         <section>
-//           <h2 style={{ fontSize: "1rem", opacity: 0.8, marginBottom: "0.75rem" }}>
-//             2. Plan généré par l’IA
-//           </h2>
+//               {recentHistory.length > 0 && (
+//                 <div
+//                   style={{
+//                     display: "flex",
+//                     flexDirection: "column",
+//                     gap: "0.6rem",
+//                   }}
+//                 >
+//                   {recentHistory.map((entry) => (
+//                     <div key={entry.id} style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+//                       {/* Message user */}
+//                       <div
+//                         style={{
+//                           alignSelf: "flex-end",
+//                           maxWidth: "80%",
+//                           background:
+//                             "linear-gradient(135deg,#4f46e5,#7c3aed)",
+//                           borderRadius: "16px 16px 2px 16px",
+//                           padding: "0.45rem 0.6rem",
+//                           fontSize: "0.8rem",
+//                           boxShadow:
+//                             "0 8px 20px rgba(79,70,229,0.6)",
+//                         }}
+//                       >
+//                         <div
+//                           style={{
+//                             fontSize: "0.7rem",
+//                             opacity: 0.75,
+//                             marginBottom: "0.15rem",
+//                           }}
+//                         >
+//                           Toi · {entry.createdAt}
+//                         </div>
+//                         <div
+//                           style={{
+//                             whiteSpace: "pre-wrap",
+//                           }}
+//                         >
+//                           {entry.prompt}
+//                         </div>
+//                       </div>
 
-//           {!plan && !loading && (
-//             <p style={{ opacity: 0.6, fontSize: "0.9rem" }}>
-//               Lance une génération pour voir le plan détaillé du backend (entités,
-//               routes, fichiers…).
-//             </p>
-//           )}
+//                       {/* Message IA */}
+//                       <div
+//                         style={{
+//                           alignSelf: "flex-start",
+//                           maxWidth: "82%",
+//                           background: "rgba(15,23,42,0.95)",
+//                           borderRadius: "16px 16px 16px 2px",
+//                           padding: "0.45rem 0.6rem",
+//                           fontSize: "0.8rem",
+//                           border: "1px solid rgba(55,65,81,0.9)",
+//                         }}
+//                       >
+//                         <div
+//                           style={{
+//                             fontSize: "0.7rem",
+//                             opacity: 0.75,
+//                             marginBottom: "0.15rem",
+//                           }}
+//                         >
+//                           CODEFLOW-AI
+//                         </div>
+//                         <div
+//                           style={{
+//                             opacity: 0.9,
+//                           }}
+//                         >
+//                           {entry.plan ? (
+//                             <>
+//                               Plan généré :{" "}
+//                               <strong>{entry.plan.stack || "Stack inconnue"}</strong>
+//                               <br />
+//                               <span style={{ fontSize: "0.75rem", opacity: 0.8 }}>
+//                                 {entry.plan.description}
+//                               </span>
+//                             </>
+//                           ) : (
+//                             <span style={{ opacity: 0.7 }}>
+//                               Aucun plan détaillé enregistré pour cette génération.
+//                             </span>
+//                           )}
+//                         </div>
+//                         <button
+//                           type="button"
+//                           onClick={() => handleLoadFromHistory(entry)}
+//                           style={{
+//                             marginTop: "0.35rem",
+//                             padding: "0.15rem 0.55rem",
+//                             borderRadius: "999px",
+//                             border: "1px solid rgba(129,140,248,0.8)",
+//                             background: "rgba(30,64,175,0.7)",
+//                             cursor: "pointer",
+//                             fontSize: "0.7rem",
+//                             color: "white",
+//                           }}
+//                         >
+//                           Recharger ce résultat
+//                         </button>
+//                       </div>
+//                     </div>
+//                   ))}
+//                 </div>
+//               )}
+//             </div>
 
-//           {plan && (
-//             <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-//               {/* Résumé */}
+//             {/* Zone de saisie type "barre de chat" */}
+//             <div
+//               style={{
+//                 marginTop: "0.35rem",
+//                 display: "flex",
+//                 flexDirection: "column",
+//                 gap: "0.4rem",
+//               }}
+//             >
+//               <textarea
+//                 value={prompt}
+//                 onChange={(e) => setPrompt(e.target.value)}
+//                 rows={3}
+//                 placeholder="Décris le backend que tu veux générer..."
+//                 style={{
+//                   width: "100%",
+//                   padding: "0.8rem 0.9rem",
+//                   borderRadius: "999px",
+//                   border: "1px solid rgba(148,163,184,0.45)",
+//                   background:
+//                     "radial-gradient(circle at top left,#020617,#000)",
+//                   color: "white",
+//                   resize: "none",
+//                   fontSize: "0.9rem",
+//                   boxSizing: "border-box",
+//                   outline: "none",
+//                 }}
+//               />
+
+//               {/* Ligne presets + bouton Générer */}
 //               <div
 //                 style={{
-//                   padding: "1rem",
-//                   borderRadius: "12px",
-//                   background:
-//                     "radial-gradient(circle at top right,#1e1b4b,#020617)",
-//                   border: "1px solid rgba(129,140,248,0.4)",
+//                   display: "flex",
+//                   flexWrap: "wrap",
+//                   gap: "0.5rem",
+//                   alignItems: "center",
+//                   justifyContent: "space-between",
 //                 }}
 //               >
 //                 <div
 //                   style={{
-//                     fontSize: "0.8rem",
-//                     opacity: 0.7,
-//                     marginBottom: "0.25rem",
+//                     display: "flex",
+//                     flexWrap: "wrap",
+//                     gap: "0.4rem",
+//                     fontSize: "0.75rem",
+//                     flex: "1 1 auto",
 //                   }}
 //                 >
-//                   Stack
+//                   <span style={{ opacity: 0.7, alignSelf: "center" }}>
+//                     Presets :
+//                   </span>
+//                   <button
+//                     type="button"
+//                     onClick={() =>
+//                       applyPresetPrompt(
+//                         "Génère un backend pour une API de todo list avec utilisateurs, authentification JWT et base PostgreSQL"
+//                       )
+//                     }
+//                     style={{
+//                       padding: "0.25rem 0.7rem",
+//                       borderRadius: "999px",
+//                       border: "1px solid rgba(148,163,184,0.5)",
+//                       background: "rgba(15,23,42,0.9)",
+//                       cursor: "pointer",
+//                       color: "rgba(226,232,240,0.95)",
+//                     }}
+//                   >
+//                     Todo + JWT + Postgres
+//                   </button>
+//                   <button
+//                     type="button"
+//                     onClick={() =>
+//                       applyPresetPrompt(
+//                         "Génère un backend pour une API de blog avec gestion des articles, des commentaires et des utilisateurs, en Node.js + Express avec une base PostgreSQL."
+//                       )
+//                     }
+//                     style={{
+//                       padding: "0.25rem 0.7rem",
+//                       borderRadius: "999px",
+//                       border: "1px solid rgba(148,163,184,0.5)",
+//                       background: "rgba(15,23,42,0.9)",
+//                       cursor: "pointer",
+//                       color: "rgba(226,232,240,0.95)",
+//                     }}
+//                   >
+//                     API Blog
+//                   </button>
+//                   <button
+//                     type="button"
+//                     onClick={() =>
+//                       applyPresetPrompt(
+//                         "Génère un backend e-commerce avec gestion des produits, des utilisateurs, des paniers et des commandes, en Node.js + Express avec PostgreSQL."
+//                       )
+//                     }
+//                     style={{
+//                       padding: "0.25rem 0.7rem",
+//                       borderRadius: "999px",
+//                       border: "1px solid rgba(148,163,184,0.5)",
+//                       background: "rgba(15,23,42,0.9)",
+//                       cursor: "pointer",
+//                       color: "rgba(226,232,240,0.95)",
+//                     }}
+//                   >
+//                     API E-commerce
+//                   </button>
+//                   <button
+//                     type="button"
+//                     onClick={() =>
+//                       applyPresetPrompt(
+//                         "Tu es un expert en architectures SaaS. Génère le backend pour un SaaS d’abonnements mensuels (gestion des plans, clients, factures, rôles, webhooks de paiement, etc.) basé sur Node.js, Express et PostgreSQL."
+//                       )
+//                     }
+//                     style={{
+//                       padding: "0.25rem 0.7rem",
+//                       borderRadius: "999px",
+//                       border: "1px solid rgba(148,163,184,0.5)",
+//                       background: "rgba(15,23,42,0.9)",
+//                       cursor: "pointer",
+//                       color: "rgba(226,232,240,0.95)",
+//                     }}
+//                   >
+//                     SaaS abonnements
+//                   </button>
 //                 </div>
-//                 <div style={{ fontWeight: 600 }}>{plan.stack}</div>
+
+//                 <button
+//                   onClick={handleGenerate}
+//                   disabled={loading}
+//                   style={{
+//                     padding: "0.65rem 1.4rem",
+//                     borderRadius: "999px",
+//                     border: "none",
+//                     background: loading
+//                       ? "rgba(99,102,241,0.4)"
+//                       : "linear-gradient(135deg,#6366f1,#8b5cf6)",
+//                     color: "white",
+//                     cursor: loading ? "default" : "pointer",
+//                     fontWeight: 600,
+//                     fontSize: "0.9rem",
+//                     boxShadow:
+//                       "0 10px 30px rgba(79,70,229,0.6), 0 0 20px rgba(59,130,246,0.5)",
+//                     transition: "transform 0.08s ease, box-shadow 0.08s ease",
+//                     flexShrink: 0,
+//                   }}
+//                 >
+//                   {loading ? "Génération..." : "Générer 🔥"}
+//                 </button>
+//               </div>
+
+//               {error && (
 //                 <p
 //                   style={{
-//                     marginTop: "0.5rem",
-//                     fontSize: "0.9rem",
-//                     opacity: 0.9,
+//                     marginTop: "0.4rem",
+//                     color: "#f97373",
+//                     fontSize: "0.8rem",
+//                     padding: "0.5rem 0.7rem",
+//                     background: "rgba(127,29,29,0.35)",
+//                     borderRadius: "999px",
 //                   }}
 //                 >
-//                   {plan.description}
+//                   ❌ {error}
 //                 </p>
-//               </div>
+//               )}
 
-//               {/* Entités */}
-//               <div
+//               <p
 //                 style={{
-//                   padding: "1rem",
-//                   borderRadius: "12px",
-//                   background: "#020617",
-//                   border: "1px solid rgba(148,163,184,0.4)",
+//                   marginTop: "0.2rem",
+//                   fontSize: "0.75rem",
+//                   opacity: 0.7,
 //                 }}
 //               >
-//                 <h3
-//                   style={{
-//                     margin: 0,
-//                     marginBottom: "0.5rem",
-//                     fontSize: "0.95rem",
-//                   }}
-//                 >
-//                   📚 Entités ({plan.entities?.length || 0})
-//                 </h3>
-//                 {(!plan.entities || plan.entities.length === 0) && (
-//                   <p style={{ fontSize: "0.85rem", opacity: 0.7 }}>
-//                     Aucune entité détectée.
+//                 Le code complet sera aussi écrit dans{" "}
+//                 <code style={{ opacity: 0.9 }}>
+//                   backend/generated/&lt;nom-projet&gt;
+//                 </code>{" "}
+//                 côté backend (via le script).
+//               </p>
+//             </div>
+//           </section>
+
+//           {/* BLOC RESULTATS */}
+//           {result && (
+//             <section
+//               style={{
+//                 borderRadius: "18px",
+//                 border: "1px solid rgba(55,65,81,0.85)",
+//                 background: "rgba(15,23,42,0.96)",
+//                 padding: "1.2rem 1.35rem 1.1rem",
+//                 display: "flex",
+//                 flexDirection: "column",
+//                 gap: "0.9rem",
+//               }}
+//             >
+//               <div
+//                 style={{
+//                   display: "flex",
+//                   justifyContent: "space-between",
+//                   alignItems: "baseline",
+//                   gap: "0.75rem",
+//                 }}
+//               >
+//                 <div>
+//                   <h2
+//                     style={{
+//                       margin: 0,
+//                       fontSize: "1rem",
+//                     }}
+//                   >
+//                     📦 Plan généré
+//                   </h2>
+//                   <p
+//                     style={{
+//                       margin: "0.25rem 0 0",
+//                       fontSize: "0.8rem",
+//                       opacity: 0.75,
+//                     }}
+//                   >
+//                     Résumé de ce backend + fichiers prêts à être copiés dans ton
+//                     projet.
 //                   </p>
+//                 </div>
+//                 {planSummary && (
+//                   <span
+//                     style={{
+//                       fontSize: "0.75rem",
+//                       opacity: 0.8,
+//                       padding: "0.25rem 0.6rem",
+//                       borderRadius: "999px",
+//                       border: "1px solid rgba(148,163,184,0.7)",
+//                     }}
+//                   >
+//                     {planSummary}
+//                   </span>
 //                 )}
-//                 {plan.entities?.map((entity) => (
-//                   <div
-//                     key={entity.name}
-//                     style={{
-//                       marginTop: "0.5rem",
-//                       padding: "0.5rem 0.75rem",
-//                       borderRadius: "8px",
-//                       background: "rgba(15,23,42,0.8)",
-//                     }}
-//                   >
-//                     <div style={{ fontWeight: 600 }}>{entity.name}</div>
-//                     <ul
-//                       style={{
-//                         margin: "0.25rem 0 0",
-//                         paddingLeft: "1.1rem",
-//                         fontSize: "0.85rem",
-//                       }}
-//                     >
-//                       {entity.fields?.map((field) => (
-//                         <li key={field.name}>
-//                           <code>{field.name}</code> : {field.type}
-//                           {field.primary ? " · primary" : ""}
-//                           {field.unique ? " · unique" : ""}
-//                           {field.reference ? ` → ${field.reference}` : ""}
-//                         </li>
-//                       ))}
-//                     </ul>
-//                   </div>
-//                 ))}
 //               </div>
 
-//               {/* Routes */}
-//               <div
-//                 style={{
-//                   padding: "1rem",
-//                   borderRadius: "12px",
-//                   background: "#020617",
-//                   border: "1px solid rgba(56,189,248,0.5)",
-//                 }}
-//               >
-//                 <h3
-//                   style={{
-//                     margin: 0,
-//                     marginBottom: "0.5rem",
-//                     fontSize: "0.95rem",
-//                   }}
-//                 >
-//                   🧭 Routes ({plan.routes?.length || 0} groupes)
-//                 </h3>
-//                 {plan.routes?.map((routeGroup) => (
+//               {plan && (
+//                 <>
+//                   {/* Résumé stack */}
 //                   <div
-//                     key={routeGroup.name}
 //                     style={{
-//                       marginTop: "0.5rem",
-//                       padding: "0.5rem 0.75rem",
-//                       borderRadius: "8px",
-//                       background: "rgba(8,47,73,0.8)",
+//                       padding: "0.8rem 0.9rem",
+//                       borderRadius: "10px",
+//                       background:
+//                         "radial-gradient(circle at top right,#1e1b4b,#020617)",
+//                       border: "1px solid rgba(129,140,248,0.5)",
 //                     }}
 //                   >
-//                     <div style={{ fontWeight: 600 }}>
-//                       {routeGroup.name}{" "}
-//                       <span style={{ opacity: 0.7, fontSize: "0.8rem" }}>
-//                         ({routeGroup.basePath})
-//                       </span>
+//                     <div
+//                       style={{
+//                         fontSize: "0.8rem",
+//                         opacity: 0.7,
+//                       }}
+//                     >
+//                       Stack
 //                     </div>
-//                     <ul
+//                     <div style={{ fontWeight: 600, fontSize: "0.95rem" }}>
+//                       {plan.stack}
+//                     </div>
+//                     <p
 //                       style={{
-//                         margin: "0.25rem 0 0",
-//                         paddingLeft: "1.1rem",
+//                         margin: "0.4rem 0 0",
 //                         fontSize: "0.85rem",
+//                         opacity: 0.9,
 //                       }}
 //                     >
-//                       {routeGroup.endpoints?.map((ep, idx) => (
-//                         <li key={idx}>
-//                           <code>{ep.method}</code> {routeGroup.basePath}
-//                           {ep.path} →{" "}
-//                           <span style={{ opacity: 0.9 }}>{ep.handler}</span>
-//                         </li>
-//                       ))}
-//                     </ul>
+//                       {plan.description}
+//                     </p>
 //                   </div>
-//                 ))}
-//               </div>
 
-//               {/* Fichiers */}
+//                   {/* Entités */}
+//                   <div
+//                     style={{
+//                       padding: "0.8rem 0.9rem",
+//                       borderRadius: "10px",
+//                       background: "#020617",
+//                       border: "1px solid rgba(148,163,184,0.45)",
+//                     }}
+//                   >
+//                     <h3
+//                       style={{
+//                         margin: 0,
+//                         marginBottom: "0.4rem",
+//                         fontSize: "0.9rem",
+//                       }}
+//                     >
+//                       📚 Entités ({plan.entities?.length || 0})
+//                     </h3>
+//                     {(!plan.entities || plan.entities.length === 0) && (
+//                       <p
+//                         style={{
+//                           fontSize: "0.8rem",
+//                           opacity: 0.7,
+//                           margin: 0,
+//                         }}
+//                       >
+//                         Aucune entité détectée.
+//                       </p>
+//                     )}
+//                     {plan.entities?.map((entity) => (
+//                       <div
+//                         key={entity.name}
+//                         style={{
+//                           marginTop: "0.4rem",
+//                           padding: "0.45rem 0.6rem",
+//                           borderRadius: "8px",
+//                           background: "rgba(15,23,42,0.9)",
+//                         }}
+//                       >
+//                         <div style={{ fontWeight: 600, fontSize: "0.9rem" }}>
+//                           {entity.name}
+//                         </div>
+//                         <ul
+//                           style={{
+//                             margin: "0.25rem 0 0",
+//                             paddingLeft: "1.1rem",
+//                             fontSize: "0.8rem",
+//                           }}
+//                         >
+//                           {entity.fields?.map((field) => (
+//                             <li key={field.name}>
+//                               <code>{field.name}</code> : {field.type}
+//                               {field.primary ? " · primary" : ""}
+//                               {field.unique ? " · unique" : ""}
+//                               {field.reference ? ` → ${field.reference}` : ""}
+//                             </li>
+//                           ))}
+//                         </ul>
+//                       </div>
+//                     ))}
+//                   </div>
+
+//                   {/* Routes */}
+//                   <div
+//                     style={{
+//                       padding: "0.8rem 0.9rem",
+//                       borderRadius: "10px",
+//                       background: "#020617",
+//                       border: "1px solid rgba(56,189,248,0.55)",
+//                     }}
+//                   >
+//                     <h3
+//                       style={{
+//                         margin: 0,
+//                         marginBottom: "0.4rem",
+//                         fontSize: "0.9rem",
+//                       }}
+//                     >
+//                       🧭 Routes ({plan.routes?.length || 0} groupes)
+//                     </h3>
+//                     {(!plan.routes || plan.routes.length === 0) && (
+//                       <p
+//                         style={{
+//                           fontSize: "0.8rem",
+//                           opacity: 0.7,
+//                           margin: 0,
+//                         }}
+//                       >
+//                         Aucune route décrite.
+//                       </p>
+//                     )}
+//                     {plan.routes?.map((routeGroup) => (
+//                       <div
+//                         key={routeGroup.name}
+//                         style={{
+//                           marginTop: "0.4rem",
+//                           padding: "0.45rem 0.6rem",
+//                           borderRadius: "8px",
+//                           background: "rgba(8,47,73,0.9)",
+//                         }}
+//                       >
+//                         <div
+//                           style={{
+//                             fontWeight: 600,
+//                             fontSize: "0.9rem",
+//                           }}
+//                         >
+//                           {routeGroup.name}{" "}
+//                           <span
+//                             style={{
+//                               opacity: 0.7,
+//                               fontSize: "0.75rem",
+//                             }}
+//                           >
+//                             ({routeGroup.basePath})
+//                           </span>
+//                         </div>
+//                         <ul
+//                           style={{
+//                             margin: "0.25rem 0 0",
+//                             paddingLeft: "1.1rem",
+//                             fontSize: "0.8rem",
+//                           }}
+//                         >
+//                           {routeGroup.endpoints?.map((ep, idx) => (
+//                             <li key={idx}>
+//                               <code>{ep.method}</code> {routeGroup.basePath}
+//                               {ep.path} →{" "}
+//                               <span style={{ opacity: 0.9 }}>{ep.handler}</span>
+//                             </li>
+//                           ))}
+//                         </ul>
+//                       </div>
+//                     ))}
+//                   </div>
+//                 </>
+//               )}
+
+//               {/* Fichiers + preview + copie */}
 //               <div
 //                 style={{
-//                   padding: "1rem",
-//                   borderRadius: "12px",
+//                   padding: "0.8rem 0.9rem",
+//                   borderRadius: "10px",
 //                   background: "#020617",
-//                   border: "1px solid rgba(148,163,184,0.4)",
+//                   border: "1px solid rgba(148,163,184,0.45)",
+//                   display: "flex",
+//                   flexDirection: "column",
+//                   gap: "0.6rem",
 //                 }}
 //               >
 //                 <h3
 //                   style={{
 //                     margin: 0,
-//                     marginBottom: "0.5rem",
-//                     fontSize: "0.95rem",
+//                     fontSize: "0.9rem",
 //                   }}
 //                 >
 //                   🗂 Fichiers générés ({files.length})
 //                 </h3>
 //                 {files.length === 0 && (
-//                   <p style={{ fontSize: "0.85rem", opacity: 0.7 }}>
+//                   <p
+//                     style={{
+//                       fontSize: "0.8rem",
+//                       opacity: 0.7,
+//                       margin: 0,
+//                     }}
+//                   >
 //                     Aucun fichier n’a été renvoyé par l’API (mais le plan est
 //                     prêt pour la génération côté backend).
 //                   </p>
 //                 )}
+
 //                 <ul
 //                   style={{
 //                     margin: 0,
-//                     paddingLeft: "0",
-//                     fontSize: "0.85rem",
-//                     maxHeight: "220px",
-//                     overflow: "auto",
+//                     paddingLeft: 0,
 //                     listStyle: "none",
+//                     fontSize: "0.8rem",
+//                     maxHeight: "180px",
+//                     overflow: "auto",
+//                     display: "flex",
+//                     flexDirection: "column",
+//                     gap: "0.25rem",
 //                   }}
 //                 >
-//                   {files.map((f) => (
-//                     <li key={f.path} style={{ marginBottom: "0.25rem" }}>
-//                       <button
-//                         type="button"
-//                         onClick={() => setSelectedFile(f)}
-//                         style={{
-//                           width: "100%",
-//                           textAlign: "left",
-//                           background:
-//                             selectedFile?.path === f.path
-//                               ? "rgba(37, 99, 235, 0.25)"
-//                               : "transparent",
-//                           borderRadius: "6px",
-//                           border: "1px solid rgba(148,163,184,0.5)",
-//                           padding: "0.3rem 0.5rem",
-//                           cursor: "pointer",
-//                           color: "inherit",
-//                           fontFamily:
-//                             "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
-//                           fontSize: "0.8rem",
-//                         }}
-//                       >
-//                         {f.path}
-//                       </button>
-//                     </li>
-//                   ))}
+//                   {files.map((f) => {
+//                     const ext = f.path.split(".").pop() || "";
+//                     let typeLabel = "Fichier";
+//                     if (f.path.includes("/models/")) typeLabel = "Model";
+//                     else if (f.path.includes("/controllers/"))
+//                       typeLabel = "Controller";
+//                     else if (f.path.includes("/routes/")) typeLabel = "Route";
+//                     else if (f.path.includes("/services/")) typeLabel = "Service";
+//                     else if (f.path.includes("/config/")) typeLabel = "Config";
+//                     else if (f.path.includes("server")) typeLabel = "Serveur";
+
+//                     return (
+//                       <li key={f.path}>
+//                         <button
+//                           type="button"
+//                           onClick={() => setSelectedFile(f)}
+//                           style={{
+//                             width: "100%",
+//                             textAlign: "left",
+//                             background:
+//                               selectedFile?.path === f.path
+//                                 ? "rgba(37,99,235,0.3)"
+//                                 : "rgba(15,23,42,0.9)",
+//                             borderRadius: "8px",
+//                             border: "1px solid rgba(75,85,99,0.9)",
+//                             padding: "0.35rem 0.55rem",
+//                             cursor: "pointer",
+//                             color: "inherit",
+//                             display: "flex",
+//                             alignItems: "center",
+//                             justifyContent: "space-between",
+//                             gap: "0.4rem",
+//                             fontFamily:
+//                               "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
+//                           }}
+//                         >
+//                           <span
+//                             style={{
+//                               display: "flex",
+//                               alignItems: "center",
+//                               gap: "0.4rem",
+//                             }}
+//                           >
+//                             <span
+//                               style={{
+//                                 fontSize: "0.7rem",
+//                                 padding: "0.1rem 0.45rem",
+//                                 borderRadius: "999px",
+//                                 border:
+//                                   "1px solid rgba(148,163,184,0.7)",
+//                                 opacity: 0.9,
+//                               }}
+//                             >
+//                               {typeLabel}
+//                             </span>
+//                             <span
+//                               style={{
+//                                 fontSize: "0.8rem",
+//                               }}
+//                             >
+//                               {f.path}
+//                             </span>
+//                           </span>
+//                           <span
+//                             style={{
+//                               fontSize: "0.7rem",
+//                               opacity: 0.7,
+//                               textTransform: "uppercase",
+//                             }}
+//                           >
+//                             .{ext}
+//                           </span>
+//                         </button>
+//                       </li>
+//                     );
+//                   })}
 //                 </ul>
 
 //                 {selectedFile && (
 //                   <div
 //                     style={{
-//                       marginTop: "0.75rem",
+//                       marginTop: "0.5rem",
 //                       borderRadius: "8px",
-//                       border: "1px solid rgba(148,163,184,0.6)",
+//                       border: "1px solid rgba(148,163,184,0.7)",
 //                       backgroundColor: "#020617",
-//                       padding: "0.75rem",
+//                       padding: "0.7rem",
 //                       maxHeight: "260px",
 //                       overflow: "auto",
 //                     }}
@@ -647,7 +998,7 @@
 //                       <span
 //                         style={{
 //                           fontSize: "0.8rem",
-//                           opacity: 0.8,
+//                           opacity: 0.85,
 //                           fontFamily:
 //                             "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
 //                         }}
@@ -658,17 +1009,17 @@
 //                         style={{
 //                           display: "flex",
 //                           alignItems: "center",
-//                           gap: "0.5rem",
+//                           gap: "0.4rem",
 //                         }}
 //                       >
 //                         <button
 //                           type="button"
 //                           onClick={handleCopySelectedFile}
 //                           style={{
-//                             padding: "0.3rem 0.8rem",
+//                             padding: "0.25rem 0.7rem",
 //                             borderRadius: "999px",
-//                             border: "1px solid rgba(148,163,184,0.7)",
-//                             background: "rgba(15,23,42,0.9)",
+//                             border: "1px solid rgba(148,163,184,0.8)",
+//                             background: "rgba(15,23,42,0.95)",
 //                             cursor: "pointer",
 //                             fontSize: "0.75rem",
 //                             fontWeight: 500,
@@ -679,11 +1030,11 @@
 //                         </button>
 //                         <span
 //                           style={{
-//                             fontSize: "0.75rem",
+//                             fontSize: "0.7rem",
 //                             opacity: 0.7,
 //                           }}
 //                         >
-//                           Ou sélectionne tout (⌘A / Ctrl+A) puis copie (⌘C / Ctrl+C)
+//                           ou ⌘A / Ctrl+A puis ⌘C / Ctrl+C
 //                         </span>
 //                       </div>
 //                     </div>
@@ -701,9 +1052,9 @@
 //                     {copyMessage && (
 //                       <p
 //                         style={{
-//                           marginTop: "0.5rem",
+//                           marginTop: "0.4rem",
 //                           fontSize: "0.8rem",
-//                           opacity: 0.85,
+//                           opacity: 0.9,
 //                           color: "#a5b4fc",
 //                         }}
 //                       >
@@ -714,194 +1065,103 @@
 //                 )}
 //               </div>
 
-//               {/* Historique des générations */}
-//               {history.length > 0 && (
+//               {/* JSON brut + bouton copier */}
+//               <div
+//                 style={{
+//                   padding: "0.8rem 0.9rem",
+//                   borderRadius: "10px",
+//                   background: "#020617",
+//                   border: "1px solid rgba(55,65,81,0.85)",
+//                   marginTop: "0.1rem",
+//                 }}
+//               >
 //                 <div
 //                   style={{
-//                     padding: "1rem",
-//                     borderRadius: "12px",
-//                     background: "#020617",
-//                     border: "1px solid rgba(55,65,81,0.8)",
+//                     display: "flex",
+//                     justifyContent: "space-between",
+//                     alignItems: "center",
+//                     gap: "0.75rem",
 //                   }}
 //                 >
 //                   <h3
 //                     style={{
 //                       margin: 0,
-//                       marginBottom: "0.5rem",
-//                       fontSize: "0.95rem",
+//                       fontSize: "0.9rem",
 //                     }}
 //                   >
-//                     🕒 Historique des générations ({history.length})
+//                     🧪 JSON brut (debug)
 //                   </h3>
-//                   <ul
-//                     style={{
-//                       margin: 0,
-//                       padding: 0,
-//                       listStyle: "none",
-//                       display: "flex",
-//                       flexDirection: "column",
-//                       gap: "0.5rem",
-//                       fontSize: "0.8rem",
-//                     }}
-//                   >
-//                     {history.map((entry) => (
-//                       <li
-//                         key={entry.id}
-//                         style={{
-//                           padding: "0.5rem 0.75rem",
-//                           borderRadius: "8px",
-//                           background: "rgba(15,23,42,0.9)",
-//                           border: "1px solid rgba(75,85,99,0.8)",
-//                         }}
-//                       >
-//                         <div
-//                           style={{
-//                             display: "flex",
-//                             justifyContent: "space-between",
-//                             alignItems: "center",
-//                             marginBottom: "0.25rem",
-//                             gap: "0.5rem",
-//                           }}
-//                         >
-//                           <span
-//                             style={{
-//                               opacity: 0.8,
-//                             }}
-//                           >
-//                             {entry.createdAt} · {entry.mode}
-//                           </span>
-//                           <button
-//                             type="button"
-//                             onClick={() => handleLoadFromHistory(entry)}
-//                             style={{
-//                               padding: "0.25rem 0.7rem",
-//                               borderRadius: "999px",
-//                               border: "1px solid rgba(129,140,248,0.9)",
-//                               background: "rgba(30,64,175,0.7)",
-//                               cursor: "pointer",
-//                               fontSize: "0.75rem",
-//                               fontWeight: 500,
-//                               color: "white",
-//                             }}
-//                           >
-//                             Recharger
-//                           </button>
-//                         </div>
-//                         <div
-//                           style={{
-//                             opacity: 0.8,
-//                             whiteSpace: "nowrap",
-//                             overflow: "hidden",
-//                             textOverflow: "ellipsis",
-//                           }}
-//                         >
-//                           {entry.prompt}
-//                         </div>
-//                       </li>
-//                     ))}
-//                   </ul>
-//                 </div>
-//               )}
-
-//               {result && (
-//                 <div
-//                   style={{
-//                     marginTop: "0.75rem",
-//                     padding: "1rem",
-//                     borderRadius: "12px",
-//                     background: "#020617",
-//                     border: "1px solid rgba(55,65,81,0.8)",
-//                   }}
-//                 >
 //                   <div
 //                     style={{
 //                       display: "flex",
-//                       justifyContent: "space-between",
 //                       alignItems: "center",
-//                       marginBottom: "0.5rem",
-//                       gap: "0.75rem",
+//                       gap: "0.5rem",
 //                     }}
 //                   >
-//                     <h3
+//                     <button
+//                       type="button"
+//                       onClick={() => setShowRawResult((prev) => !prev)}
 //                       style={{
-//                         margin: 0,
-//                         fontSize: "0.95rem",
+//                         padding: "0.25rem 0.7rem",
+//                         borderRadius: "999px",
+//                         border: "1px solid rgba(148,163,184,0.7)",
+//                         background: "rgba(15,23,42,0.95)",
+//                         cursor: "pointer",
+//                         fontSize: "0.75rem",
+//                         fontWeight: 500,
+//                         color: "rgba(226,232,240,0.95)",
 //                       }}
 //                     >
-//                       📦 Résultat JSON brut (debug)
-//                     </h3>
-//                     <div
+//                       {showRawResult ? "Masquer" : "Afficher"}
+//                     </button>
+//                     <button
+//                       type="button"
+//                       onClick={handleCopyRawResult}
 //                       style={{
-//                         display: "flex",
-//                         alignItems: "center",
-//                         gap: "0.5rem",
+//                         padding: "0.25rem 0.7rem",
+//                         borderRadius: "999px",
+//                         border: "1px solid rgba(129,140,248,0.9)",
+//                         background: "rgba(30,64,175,0.7)",
+//                         cursor: "pointer",
+//                         fontSize: "0.75rem",
+//                         fontWeight: 500,
+//                         color: "white",
 //                       }}
 //                     >
-//                       <button
-//                         type="button"
-//                         onClick={() => setShowRawResult((prev) => !prev)}
-//                         style={{
-//                           padding: "0.25rem 0.7rem",
-//                           borderRadius: "999px",
-//                           border: "1px solid rgba(148,163,184,0.7)",
-//                           background: "rgba(15,23,42,0.9)",
-//                           cursor: "pointer",
-//                           fontSize: "0.75rem",
-//                           fontWeight: 500,
-//                           color: "rgba(226,232,240,0.95)",
-//                         }}
-//                       >
-//                         {showRawResult ? "Masquer" : "Afficher"}
-//                       </button>
-//                       <button
-//                         type="button"
-//                         onClick={handleCopyRawResult}
-//                         style={{
-//                           padding: "0.25rem 0.7rem",
-//                           borderRadius: "999px",
-//                           border: "1px solid rgba(129,140,248,0.9)",
-//                           background: "rgba(30,64,175,0.7)",
-//                           cursor: "pointer",
-//                           fontSize: "0.75rem",
-//                           fontWeight: 500,
-//                           color: "white",
-//                         }}
-//                       >
-//                         Copier le JSON
-//                       </button>
-//                     </div>
+//                       Copier le JSON
+//                     </button>
 //                   </div>
-//                   {showRawResult && (
-//                     <pre
-//                       style={{
-//                         margin: 0,
-//                         fontSize: "0.8rem",
-//                         lineHeight: 1.4,
-//                         whiteSpace: "pre",
-//                         overflowX: "auto",
-//                         maxHeight: "260px",
-//                       }}
-//                     >
-//                       <code>{JSON.stringify(result, null, 2)}</code>
-//                     </pre>
-//                   )}
-//                   {rawCopyMessage && (
-//                     <p
-//                       style={{
-//                         marginTop: "0.5rem",
-//                         fontSize: "0.8rem",
-//                         opacity: 0.85,
-//                         color: "#a5b4fc",
-//                       }}
-//                     >
-//                       {rawCopyMessage}
-//                     </p>
-//                   )}
 //                 </div>
-//               )}
-//             </div>
+//                 {showRawResult && (
+//                   <pre
+//                     style={{
+//                       margin: "0.5rem 0 0",
+//                       fontSize: "0.8rem",
+//                       lineHeight: 1.4,
+//                       whiteSpace: "pre",
+//                       overflowX: "auto",
+//                       maxHeight: "260px",
+//                     }}
+//                   >
+//                     <code>{JSON.stringify(result, null, 2)}</code>
+//                   </pre>
+//                 )}
+//                 {rawCopyMessage && (
+//                   <p
+//                     style={{
+//                       marginTop: "0.4rem",
+//                       fontSize: "0.8rem",
+//                       opacity: 0.9,
+//                       color: "#a5b4fc",
+//                     }}
+//                   >
+//                     {rawCopyMessage}
+//                   </p>
+//                 )}
+//               </div>
+//             </section>
 //           )}
-//         </section>
+//         </div>
 //       </main>
 //     </div>
 //   );
@@ -910,6 +1170,14 @@
 // export default App;
 
 import { useState } from "react";
+const theme = {
+  bgGradientMain:
+    "radial-gradient(circle at top, #020617 0, #020617 40%, #000 100%)",
+  textMain: "#e5f3ff",
+  headerBorder: "1px solid rgba(15,118,110,0.35)",
+  headerBg:
+    "linear-gradient(90deg, rgba(15,23,42,0.96), rgba(8,47,73,0.96))",
+};
 
 function App() {
   const [prompt, setPrompt] = useState(
@@ -921,7 +1189,6 @@ function App() {
   const [error, setError] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
 
-  // 🔥 Nouveaux états
   const [history, setHistory] = useState([]);
   const [copyMessage, setCopyMessage] = useState("");
   const [showRawResult, setShowRawResult] = useState(false);
@@ -948,15 +1215,15 @@ function App() {
     setPrompt(presetPrompt);
   };
 
-  // 🕒 Recharger une génération précédente
   const handleLoadFromHistory = (entry) => {
     setPrompt(entry.prompt);
     setMode(entry.mode);
     setResult({ plan: entry.plan, files: entry.files });
     setSelectedFile(null);
+    setShowRawResult(false);
+    setError("");
   };
 
-  // 📋 Copier le contenu du fichier sélectionné
   const handleCopySelectedFile = async () => {
     if (!selectedFile?.content) return;
     try {
@@ -1010,7 +1277,6 @@ function App() {
 
       setResult(data);
 
-      // 📝 Ajout dans l’historique (max 10 entrées)
       const entry = {
         id: Date.now(),
         createdAt: new Date().toLocaleTimeString(),
@@ -1019,7 +1285,7 @@ function App() {
         plan: data.plan || null,
         files: data.files || [],
       };
-      setHistory((prev) => [entry, ...prev].slice(0, 10));
+      setHistory((prev) => [entry, ...prev].slice(0, 15));
     } catch (err) {
       console.error(err);
       setError(err.message || "Erreur inconnue");
@@ -1030,7 +1296,7 @@ function App() {
 
   const plan = result?.plan;
   const files = result?.files || [];
-  const recentHistory = history.slice(0, 5);
+  const recentHistory = history.slice(0, 6);
 
   const planSummary =
     plan && `${plan.entities?.length || 0} entités · ${
@@ -1041,50 +1307,85 @@ function App() {
     <div
       style={{
         minHeight: "100vh",
-        background:
-          "radial-gradient(circle at top, #0b1120 0, #020617 45%, #000 100%)",
-        color: "white",
+        background: theme.bgGradientMain,
+        color: theme.textMain,
         fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
       }}
     >
       {/* HEADER */}
       <header
         style={{
-          padding: "1rem 1.5rem",
-          borderBottom: "1px solid rgba(148,163,184,0.25)",
+          padding: "1rem 1.75rem",
+          borderBottom: theme.headerBorder,
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
           position: "sticky",
           top: 0,
           backdropFilter: "blur(18px)",
-          background:
-            "linear-gradient(90deg, rgba(15,23,42,0.9), rgba(2,6,23,0.95))",
+          background: theme.headerBg,
           zIndex: 20,
         }}
       >
-        <div>
-          <div style={{ fontSize: "0.75rem", opacity: 0.6 }}>Pridano Labs</div>
-          <h1
+        <div style={{ display: "flex", alignItems: "center", gap: "0.8rem" }}>
+          <div
             style={{
-              margin: 0,
-              fontSize: "1.4rem",
-              fontWeight: 700,
-              letterSpacing: "0.03em",
+              width: "40px",
+              height: "40px",
+              borderRadius: "12px",
+              background:
+                "radial-gradient(circle at 30% 0%, #22c55e 0, #0ea5e9 40%, #0369a1 100%)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              overflow: "hidden",
+              boxShadow: "0 0 0 1px rgba(15,118,110,0.5)",
             }}
           >
-            🚀 CODEFLOW-AI
-          </h1>
-          <p
-            style={{
-              margin: "0.2rem 0 0",
-              fontSize: "0.8rem",
-              opacity: 0.75,
-            }}
-          >
-            Ton IA pour générer des backends Node.js / Postgres prêts à copier.
-          </p>
+            {/* Remplace le src par le chemin de ton vrai logo (ex: /codeflow-logo.png) */}
+            <img
+              src="/images/codeflow-logo.png"
+              alt="Logo CODEFLOW AI"
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "contain",
+                display: "block",
+              }}
+            />
+          </div>
+          <div>
+            <div
+              style={{
+                fontSize: "0.75rem",
+                opacity: 0.65,
+              }}
+            >
+              Pridano Labs
+            </div>
+            <h1
+              style={{
+                margin: 0,
+                fontSize: "1.35rem",
+                fontWeight: 700,
+                letterSpacing: "0.04em",
+              }}
+            >
+              CODEFLOW-AI
+            </h1>
+            <p
+              style={{
+                margin: "0.2rem 0 0",
+                fontSize: "0.8rem",
+                opacity: 0.8,
+              }}
+            >
+              Ton IA pour générer des backends Node.js / Postgres prêts à être
+              collés dans VSCode.
+            </p>
+          </div>
         </div>
+
         <div
           style={{
             display: "flex",
@@ -1097,7 +1398,7 @@ function App() {
               fontSize: "0.8rem",
               padding: "0.25rem 0.7rem",
               borderRadius: "999px",
-              border: "1px solid rgba(148,163,184,0.4)",
+              border: "1px solid rgba(148,163,184,0.45)",
               opacity: 0.9,
             }}
           >
@@ -1106,10 +1407,10 @@ function App() {
         </div>
       </header>
 
-      {/* MAIN */}
+      {/* MAIN LAYOUT */}
       <main
         style={{
-          padding: "1.5rem 0.75rem 3rem",
+          padding: "1.5rem 1.2rem 2.5rem",
           display: "flex",
           justifyContent: "center",
         }}
@@ -1117,165 +1418,471 @@ function App() {
         <div
           style={{
             width: "100%",
-            maxWidth: "960px",
+            maxWidth: "1200px",
             display: "flex",
-            flexDirection: "column",
             gap: "1.5rem",
           }}
         >
-          {/* BLOC "CHAT" */}
-          <section
+          {/* SIDEBAR */}
+          <aside
             style={{
-              borderRadius: "18px",
-              border: "1px solid rgba(148,163,184,0.35)",
-              background:
-                "linear-gradient(145deg, rgba(15,23,42,0.96), rgba(15,23,42,0.75))",
-              boxShadow:
-                "0 22px 80px rgba(15,23,42,0.9), 0 0 60px rgba(59,130,246,0.25)",
-              padding: "1.25rem 1.35rem 1rem",
+              width: "250px",
+              flexShrink: 0,
               display: "flex",
               flexDirection: "column",
-              gap: "0.75rem",
+              gap: "1rem",
             }}
           >
-            {/* Modes (genre "system prompt") */}
+            {/* Carte produit */}
             <div
               style={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: "0.4rem",
-                marginBottom: "0.4rem",
+                borderRadius: "18px",
+                border: "1px solid rgba(45,212,191,0.4)",
+                background:
+                  "radial-gradient(circle at top,#022c22,#020617 60%)",
+                padding: "0.9rem 1rem",
+                boxShadow:
+                  "0 18px 60px rgba(6,95,70,0.7), 0 0 40px rgba(8,47,73,0.6)",
               }}
             >
+              <div
+                style={{
+                  fontSize: "0.78rem",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.14em",
+                  opacity: 0.7,
+                  marginBottom: "0.25rem",
+                }}
+              >
+                Flow backend
+              </div>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: "0.86rem",
+                  opacity: 0.92,
+                }}
+              >
+                Décris ton API, CODEFLOW-AI sort le plan d&apos;archi +
+                fichiers modèles (routes, modèles, services...).
+              </p>
+            </div>
+
+            {/* Visuels d'architecture (placeholders pour tes images) */}
+            <div
+              style={{
+                borderRadius: "16px",
+                border: "1px solid rgba(37,99,235,0.7)",
+                background: "rgba(15,23,42,0.98)",
+                padding: "0.7rem 0.8rem",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.5rem",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "0.8rem",
+                  opacity: 0.8,
+                  marginBottom: "0.1rem",
+                }}
+              >
+                Vue d&apos;ensemble backend
+              </div>
+
+              <div
+                style={{
+                  borderRadius: "12px",
+                  overflow: "hidden",
+                  border: "1px solid rgba(148,163,184,0.4)",
+                  background: "rgba(15,23,42,0.95)",
+                }}
+              >
+                {/* Schéma global (image 1) */}
+                {/* Remplace le src par ton image de type &quot;diagramme backend&quot; */}
+                <img
+                  src="/images/backend-architecture-1.png"
+                  alt="Schéma d&apos;architecture backend"
+                  style={{
+                    width: "100%",
+                    height: "120px",
+                    objectFit: "cover",
+                    display: "block",
+                  }}
+                />
+              </div>
+
+              <div
+                style={{
+                  borderRadius: "12px",
+                  overflow: "hidden",
+                  border: "1px solid rgba(148,163,184,0.4)",
+                  background: "rgba(15,23,42,0.95)",
+                }}
+              >
+                {/* Schéma entités / routes (image 2) */}
+                {/* Remplace le src par ton image de type &quot;User / Express / Booking / Routes&quot; */}
+                <img
+                  src="/images/backend-architecture-2.png"
+                  alt="Diagramme entités et routes"
+                  style={{
+                    width: "100%",
+                    height: "120px",
+                    objectFit: "cover",
+                    display: "block",
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Sélecteur de mode */}
+            <div
+              style={{
+                borderRadius: "14px",
+                border: "1px solid rgba(51,65,85,0.9)",
+                background: "rgba(15,23,42,0.95)",
+                padding: "0.85rem 0.9rem",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.45rem",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "0.8rem",
+                  opacity: 0.8,
+                  marginBottom: "0.15rem",
+                }}
+              >
+                Mode IA
+              </div>
               <button
                 type="button"
                 onClick={() => handleModeChange("backend-simple")}
                 style={{
-                  padding: "0.25rem 0.8rem",
+                  padding: "0.35rem 0.7rem",
                   borderRadius: "999px",
                   border:
                     mode === "backend-simple"
-                      ? "1px solid rgba(129,140,248,0.9)"
-                      : "1px solid rgba(148,163,184,0.4)",
+                      ? "1px solid rgba(34,197,94,0.9)"
+                      : "1px solid rgba(51,65,85,0.9)",
                   background:
                     mode === "backend-simple"
-                      ? "linear-gradient(135deg,#6366f1,#8b5cf6)"
+                      ? "linear-gradient(135deg,#22c55e,#0ea5e9)"
                       : "rgba(15,23,42,0.9)",
-                  fontSize: "0.75rem",
+                  fontSize: "0.78rem",
                   fontWeight: 500,
                   cursor: "pointer",
                   color:
                     mode === "backend-simple"
-                      ? "white"
+                      ? "#ecfeff"
                       : "rgba(226,232,240,0.9)",
+                  textAlign: "left",
                 }}
               >
                 Backend simple
+                <span style={{ opacity: 0.7, marginLeft: 4 }}>
+                  · Todo, CRUD, JWT...
+                </span>
               </button>
               <button
                 type="button"
                 onClick={() => handleModeChange("full-project")}
                 style={{
-                  padding: "0.25rem 0.8rem",
+                  padding: "0.35rem 0.7rem",
                   borderRadius: "999px",
                   border:
                     mode === "full-project"
-                      ? "1px solid rgba(129,140,248,0.9)"
-                      : "1px solid rgba(148,163,184,0.4)",
+                      ? "1px solid rgba(34,197,94,0.9)"
+                      : "1px solid rgba(51,65,85,0.9)",
                   background:
                     mode === "full-project"
-                      ? "linear-gradient(135deg,#6366f1,#8b5cf6)"
+                      ? "linear-gradient(135deg,#22c55e,#0ea5e9)"
                       : "rgba(15,23,42,0.9)",
-                  fontSize: "0.75rem",
+                  fontSize: "0.78rem",
                   fontWeight: 500,
                   cursor: "pointer",
                   color:
                     mode === "full-project"
-                      ? "white"
+                      ? "#ecfeff"
                       : "rgba(226,232,240,0.9)",
+                  textAlign: "left",
                 }}
               >
                 Projet complet
+                <span style={{ opacity: 0.7, marginLeft: 4 }}>
+                  · SaaS structuré
+                </span>
               </button>
               <button
                 type="button"
                 onClick={() => handleModeChange("auto-dev")}
                 style={{
-                  padding: "0.25rem 0.8rem",
+                  padding: "0.35rem 0.7rem",
                   borderRadius: "999px",
                   border:
                     mode === "auto-dev"
-                      ? "1px solid rgba(129,140,248,0.9)"
-                      : "1px solid rgba(148,163,184,0.4)",
+                      ? "1px solid rgba(34,197,94,0.9)"
+                      : "1px solid rgba(51,65,85,0.9)",
                   background:
                     mode === "auto-dev"
-                      ? "linear-gradient(135deg,#6366f1,#8b5cf6)"
+                      ? "linear-gradient(135deg,#22c55e,#0ea5e9)"
                       : "rgba(15,23,42,0.9)",
-                  fontSize: "0.75rem",
+                  fontSize: "0.78rem",
                   fontWeight: 500,
                   cursor: "pointer",
                   color:
-                    mode === "auto-dev" ? "white" : "rgba(226,232,240,0.9)",
+                    mode === "auto-dev"
+                      ? "#ecfeff"
+                      : "rgba(226,232,240,0.9)",
+                  textAlign: "left",
                 }}
               >
                 Mode auto-dev
+                <span style={{ opacity: 0.7, marginLeft: 4 }}>
+                  · Archi plus avancée
+                </span>
               </button>
             </div>
 
-            {/* "Conversation" style ChatGPT */}
+            {/* Historique dans la sidebar */}
             <div
               style={{
-                borderRadius: "12px",
-                border: "1px solid rgba(30,64,175,0.6)",
-                background:
-                  "radial-gradient(circle at top left,#111827,#020617)",
-                padding: "0.75rem",
-                maxHeight: "250px",
-                overflow: "auto",
+                borderRadius: "14px",
+                border: "1px solid rgba(30,64,175,0.7)",
+                background: "rgba(15,23,42,0.96)",
+                padding: "0.85rem 0.9rem",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.45rem",
+                flex: 1,
+                minHeight: "0",
               }}
             >
+              <div
+                style={{
+                  fontSize: "0.8rem",
+                  opacity: 0.8,
+                  marginBottom: "0.15rem",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <span>Historique</span>
+                {history.length > 0 && (
+                  <span
+                    style={{
+                      fontSize: "0.7rem",
+                      opacity: 0.7,
+                    }}
+                  >
+                    {history.length} générations
+                  </span>
+                )}
+              </div>
+
               {recentHistory.length === 0 && (
                 <p
                   style={{
                     margin: 0,
-                    fontSize: "0.8rem",
+                    fontSize: "0.78rem",
                     opacity: 0.7,
                   }}
                 >
-                  Commence par décrire le backend que tu veux et CODEFLOW-AI te
-                  renverra un plan + des fichiers prêts à copier.
+                  Tes dernières générations apparaîtront ici, prêtes à être
+                  rechargées.
                 </p>
               )}
 
               {recentHistory.length > 0 && (
-                <div
+                <ul
                   style={{
+                    margin: 0,
+                    padding: 0,
+                    listStyle: "none",
                     display: "flex",
                     flexDirection: "column",
-                    gap: "0.6rem",
+                    gap: "0.4rem",
+                    fontSize: "0.78rem",
+                    maxHeight: "210px",
+                    overflow: "auto",
                   }}
                 >
                   {recentHistory.map((entry) => (
-                    <div key={entry.id} style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                    <li key={entry.id}>
+                      <button
+                        type="button"
+                        onClick={() => handleLoadFromHistory(entry)}
+                        style={{
+                          width: "100%",
+                          textAlign: "left",
+                          borderRadius: "10px",
+                          border: "1px solid rgba(51,65,85,0.95)",
+                          background: "rgba(15,23,42,0.98)",
+                          padding: "0.35rem 0.5rem",
+                          cursor: "pointer",
+                          color: "inherit",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "0.1rem",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            gap: "0.25rem",
+                          }}
+                        >
+                          <span
+                            style={{
+                              opacity: 0.75,
+                            }}
+                          >
+                            {entry.mode}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: "0.7rem",
+                              opacity: 0.65,
+                            }}
+                          >
+                            {entry.createdAt}
+                          </span>
+                        </div>
+                        <div
+                          style={{
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            opacity: 0.8,
+                          }}
+                        >
+                          {entry.prompt}
+                        </div>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </aside>
+
+          {/* MAIN COLUMN (CHAT + RESULTS) */}
+          <section
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              gap: "1rem",
+              minWidth: 0,
+            }}
+          >
+            {/* CHAT BLOCK */}
+            <section
+              style={{
+                borderRadius: "18px",
+                border: "1px solid rgba(30,64,175,0.7)",
+                background:
+                  "linear-gradient(145deg, rgba(15,23,42,0.98), rgba(8,47,73,0.95))",
+                boxShadow:
+                  "0 22px 80px rgba(15,23,42,0.9), 0 0 50px rgba(56,189,248,0.2)",
+                padding: "1rem 1.1rem 0.85rem",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.75rem",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "baseline",
+                  gap: "0.75rem",
+                }}
+              >
+                <div>
+                  <h2
+                    style={{
+                      margin: 0,
+                      fontSize: "0.98rem",
+                    }}
+                  >
+                    Décris ton backend, CODEFLOW fait le reste.
+                  </h2>
+                  <p
+                    style={{
+                      margin: "0.2rem 0 0",
+                      fontSize: "0.8rem",
+                      opacity: 0.78,
+                    }}
+                  >
+                    Tu peux écrire en français ou anglais, décrire ton API, tes
+                    entités, ta stack...
+                  </p>
+                </div>
+              </div>
+
+              {/* Zone "conversation" */}
+              <div
+                style={{
+                  borderRadius: "12px",
+                  border: "1px solid rgba(30,64,175,0.7)",
+                  background:
+                    "radial-gradient(circle at top left,#020617,#020617)",
+                  padding: "0.75rem",
+                  maxHeight: "260px",
+                  overflow: "auto",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.6rem",
+                }}
+              >
+                {recentHistory.length === 0 && (
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: "0.8rem",
+                      opacity: 0.75,
+                    }}
+                  >
+                    Exemples : &quot;API de todo list avec utilisateurs et JWT&quot;,
+                    &quot;Backend e-commerce Node + Postgres&quot;,
+                    &quot;SaaS d&apos;abonnements avec rôles admin / user&quot;...
+                  </p>
+                )}
+
+                {recentHistory.length > 0 &&
+                  recentHistory.map((entry) => (
+                    <div
+                      key={entry.id}
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "0.25rem",
+                      }}
+                    >
                       {/* Message user */}
                       <div
                         style={{
                           alignSelf: "flex-end",
                           maxWidth: "80%",
                           background:
-                            "linear-gradient(135deg,#4f46e5,#7c3aed)",
+                            "linear-gradient(135deg,#0ea5e9,#22c55e)",
                           borderRadius: "16px 16px 2px 16px",
                           padding: "0.45rem 0.6rem",
                           fontSize: "0.8rem",
-                          boxShadow:
-                            "0 8px 20px rgba(79,70,229,0.6)",
+                          boxShadow: "0 8px 22px rgba(14,165,233,0.6)",
+                          color: "#e0f2fe",
                         }}
                       >
                         <div
                           style={{
                             fontSize: "0.7rem",
-                            opacity: 0.75,
-                            marginBottom: "0.15rem",
+                            opacity: 0.8,
+                            marginBottom: "0.12rem",
                           }}
                         >
                           Toi · {entry.createdAt}
@@ -1294,704 +1901,472 @@ function App() {
                         style={{
                           alignSelf: "flex-start",
                           maxWidth: "82%",
-                          background: "rgba(15,23,42,0.95)",
+                          background: "rgba(15,23,42,0.98)",
                           borderRadius: "16px 16px 16px 2px",
                           padding: "0.45rem 0.6rem",
                           fontSize: "0.8rem",
-                          border: "1px solid rgba(55,65,81,0.9)",
+                          border: "1px solid rgba(30,64,175,0.9)",
                         }}
                       >
                         <div
                           style={{
                             fontSize: "0.7rem",
-                            opacity: 0.75,
-                            marginBottom: "0.15rem",
+                            opacity: 0.8,
+                            marginBottom: "0.12rem",
                           }}
                         >
                           CODEFLOW-AI
                         </div>
                         <div
                           style={{
-                            opacity: 0.9,
+                            opacity: 0.92,
                           }}
                         >
                           {entry.plan ? (
                             <>
                               Plan généré :{" "}
-                              <strong>{entry.plan.stack || "Stack inconnue"}</strong>
+                              <strong>
+                                {entry.plan.stack || "Stack inconnue"}
+                              </strong>
                               <br />
-                              <span style={{ fontSize: "0.75rem", opacity: 0.8 }}>
+                              <span
+                                style={{
+                                  fontSize: "0.75rem",
+                                  opacity: 0.8,
+                                }}
+                              >
                                 {entry.plan.description}
                               </span>
                             </>
                           ) : (
                             <span style={{ opacity: 0.7 }}>
-                              Aucun plan détaillé enregistré pour cette génération.
+                              Aucun plan détaillé enregistré pour cette
+                              génération.
                             </span>
                           )}
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => handleLoadFromHistory(entry)}
-                          style={{
-                            marginTop: "0.35rem",
-                            padding: "0.15rem 0.55rem",
-                            borderRadius: "999px",
-                            border: "1px solid rgba(129,140,248,0.8)",
-                            background: "rgba(30,64,175,0.7)",
-                            cursor: "pointer",
-                            fontSize: "0.7rem",
-                            color: "white",
-                          }}
-                        >
-                          Recharger ce résultat
-                        </button>
                       </div>
                     </div>
                   ))}
-                </div>
-              )}
-            </div>
+              </div>
 
-            {/* Zone de saisie type "barre de chat" */}
-            <div
-              style={{
-                marginTop: "0.35rem",
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.4rem",
-              }}
-            >
-              <textarea
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                rows={3}
-                placeholder="Décris le backend que tu veux générer..."
-                style={{
-                  width: "100%",
-                  padding: "0.8rem 0.9rem",
-                  borderRadius: "999px",
-                  border: "1px solid rgba(148,163,184,0.45)",
-                  background:
-                    "radial-gradient(circle at top left,#020617,#000)",
-                  color: "white",
-                  resize: "none",
-                  fontSize: "0.9rem",
-                  boxSizing: "border-box",
-                  outline: "none",
-                }}
-              />
-
-              {/* Ligne presets + bouton Générer */}
+              {/* Input + presets + bouton */}
               <div
                 style={{
+                  marginTop: "0.35rem",
                   display: "flex",
-                  flexWrap: "wrap",
-                  gap: "0.5rem",
-                  alignItems: "center",
-                  justifyContent: "space-between",
+                  flexDirection: "column",
+                  gap: "0.45rem",
                 }}
               >
+                <textarea
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  rows={3}
+                  placeholder="Décris le backend que tu veux générer..."
+                  style={{
+                    width: "100%",
+                    padding: "0.85rem 1rem",
+                    borderRadius: "999px",
+                    border: "1px solid rgba(51,65,85,0.95)",
+                    background:
+                      "radial-gradient(circle at top left,#020617,#000)",
+                    color: "#e5f3ff",
+                    resize: "none",
+                    fontSize: "0.9rem",
+                    boxSizing: "border-box",
+                    outline: "none",
+                  }}
+                />
+
                 <div
                   style={{
                     display: "flex",
                     flexWrap: "wrap",
-                    gap: "0.4rem",
-                    fontSize: "0.75rem",
-                    flex: "1 1 auto",
+                    gap: "0.5rem",
+                    alignItems: "center",
+                    justifyContent: "space-between",
                   }}
                 >
-                  <span style={{ opacity: 0.7, alignSelf: "center" }}>
-                    Presets :
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      applyPresetPrompt(
-                        "Génère un backend pour une API de todo list avec utilisateurs, authentification JWT et base PostgreSQL"
-                      )
-                    }
+                  <div
                     style={{
-                      padding: "0.25rem 0.7rem",
-                      borderRadius: "999px",
-                      border: "1px solid rgba(148,163,184,0.5)",
-                      background: "rgba(15,23,42,0.9)",
-                      cursor: "pointer",
-                      color: "rgba(226,232,240,0.95)",
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: "0.4rem",
+                      fontSize: "0.75rem",
+                      flex: "1 1 auto",
                     }}
                   >
-                    Todo + JWT + Postgres
-                  </button>
+                    <span style={{ opacity: 0.7, alignSelf: "center" }}>
+                      Presets :
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        applyPresetPrompt(
+                          "Génère un backend pour une API de todo list avec utilisateurs, authentification JWT et base PostgreSQL"
+                        )
+                      }
+                      style={{
+                        padding: "0.25rem 0.7rem",
+                        borderRadius: "999px",
+                        border: "1px solid rgba(51,65,85,0.9)",
+                        background: "rgba(15,23,42,0.95)",
+                        cursor: "pointer",
+                        color: "rgba(226,232,240,0.95)",
+                      }}
+                    >
+                      Todo + JWT + Postgres
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        applyPresetPrompt(
+                          "Génère un backend pour une API de blog avec gestion des articles, des commentaires et des utilisateurs, en Node.js + Express avec une base PostgreSQL."
+                        )
+                      }
+                      style={{
+                        padding: "0.25rem 0.7rem",
+                        borderRadius: "999px",
+                        border: "1px solid rgba(51,65,85,0.9)",
+                        background: "rgba(15,23,42,0.95)",
+                        cursor: "pointer",
+                        color: "rgba(226,232,240,0.95)",
+                      }}
+                    >
+                      API Blog
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        applyPresetPrompt(
+                          "Génère un backend e-commerce avec gestion des produits, des utilisateurs, des paniers et des commandes, en Node.js + Express avec PostgreSQL."
+                        )
+                      }
+                      style={{
+                        padding: "0.25rem 0.7rem",
+                        borderRadius: "999px",
+                        border: "1px solid rgba(51,65,85,0.9)",
+                        background: "rgba(15,23,42,0.95)",
+                        cursor: "pointer",
+                        color: "rgba(226,232,240,0.95)",
+                      }}
+                    >
+                      API E-commerce
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        applyPresetPrompt(
+                          "Tu es un expert en architectures SaaS. Génère le backend pour un SaaS d’abonnements mensuels (gestion des plans, clients, factures, rôles, webhooks de paiement, etc.) basé sur Node.js, Express et PostgreSQL."
+                        )
+                      }
+                      style={{
+                        padding: "0.25rem 0.7rem",
+                        borderRadius: "999px",
+                        border: "1px solid rgba(51,65,85,0.9)",
+                        background: "rgba(15,23,42,0.95)",
+                        cursor: "pointer",
+                        color: "rgba(226,232,240,0.95)",
+                      }}
+                    >
+                      SaaS abonnements
+                    </button>
+                  </div>
+
                   <button
-                    type="button"
-                    onClick={() =>
-                      applyPresetPrompt(
-                        "Génère un backend pour une API de blog avec gestion des articles, des commentaires et des utilisateurs, en Node.js + Express avec une base PostgreSQL."
-                      )
-                    }
+                    onClick={handleGenerate}
+                    disabled={loading}
                     style={{
-                      padding: "0.25rem 0.7rem",
+                      padding: "0.65rem 1.4rem",
                       borderRadius: "999px",
-                      border: "1px solid rgba(148,163,184,0.5)",
-                      background: "rgba(15,23,42,0.9)",
-                      cursor: "pointer",
-                      color: "rgba(226,232,240,0.95)",
+                      border: "none",
+                      background: loading
+                        ? "rgba(45,212,191,0.35)"
+                        : "linear-gradient(135deg,#22c55e,#0ea5e9)",
+                      color: "#ecfeff",
+                      cursor: loading ? "default" : "pointer",
+                      fontWeight: 600,
+                      fontSize: "0.9rem",
+                      boxShadow:
+                        "0 10px 30px rgba(34,197,94,0.55), 0 0 20px rgba(14,165,233,0.55)",
+                      transition:
+                        "transform 0.08s ease, box-shadow 0.08s ease, background 0.08s ease",
+                      flexShrink: 0,
                     }}
                   >
-                    API Blog
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      applyPresetPrompt(
-                        "Génère un backend e-commerce avec gestion des produits, des utilisateurs, des paniers et des commandes, en Node.js + Express avec PostgreSQL."
-                      )
-                    }
-                    style={{
-                      padding: "0.25rem 0.7rem",
-                      borderRadius: "999px",
-                      border: "1px solid rgba(148,163,184,0.5)",
-                      background: "rgba(15,23,42,0.9)",
-                      cursor: "pointer",
-                      color: "rgba(226,232,240,0.95)",
-                    }}
-                  >
-                    API E-commerce
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      applyPresetPrompt(
-                        "Tu es un expert en architectures SaaS. Génère le backend pour un SaaS d’abonnements mensuels (gestion des plans, clients, factures, rôles, webhooks de paiement, etc.) basé sur Node.js, Express et PostgreSQL."
-                      )
-                    }
-                    style={{
-                      padding: "0.25rem 0.7rem",
-                      borderRadius: "999px",
-                      border: "1px solid rgba(148,163,184,0.5)",
-                      background: "rgba(15,23,42,0.9)",
-                      cursor: "pointer",
-                      color: "rgba(226,232,240,0.95)",
-                    }}
-                  >
-                    SaaS abonnements
+                    {loading ? "Génération..." : "Générer 🔥"}
                   </button>
                 </div>
 
-                <button
-                  onClick={handleGenerate}
-                  disabled={loading}
-                  style={{
-                    padding: "0.65rem 1.4rem",
-                    borderRadius: "999px",
-                    border: "none",
-                    background: loading
-                      ? "rgba(99,102,241,0.4)"
-                      : "linear-gradient(135deg,#6366f1,#8b5cf6)",
-                    color: "white",
-                    cursor: loading ? "default" : "pointer",
-                    fontWeight: 600,
-                    fontSize: "0.9rem",
-                    boxShadow:
-                      "0 10px 30px rgba(79,70,229,0.6), 0 0 20px rgba(59,130,246,0.5)",
-                    transition: "transform 0.08s ease, box-shadow 0.08s ease",
-                    flexShrink: 0,
-                  }}
-                >
-                  {loading ? "Génération..." : "Générer 🔥"}
-                </button>
-              </div>
-
-              {error && (
-                <p
-                  style={{
-                    marginTop: "0.4rem",
-                    color: "#f97373",
-                    fontSize: "0.8rem",
-                    padding: "0.5rem 0.7rem",
-                    background: "rgba(127,29,29,0.35)",
-                    borderRadius: "999px",
-                  }}
-                >
-                  ❌ {error}
-                </p>
-              )}
-
-              <p
-                style={{
-                  marginTop: "0.2rem",
-                  fontSize: "0.75rem",
-                  opacity: 0.7,
-                }}
-              >
-                Le code complet sera aussi écrit dans{" "}
-                <code style={{ opacity: 0.9 }}>
-                  backend/generated/&lt;nom-projet&gt;
-                </code>{" "}
-                côté backend (via le script).
-              </p>
-            </div>
-          </section>
-
-          {/* BLOC RESULTATS */}
-          {result && (
-            <section
-              style={{
-                borderRadius: "18px",
-                border: "1px solid rgba(55,65,81,0.85)",
-                background: "rgba(15,23,42,0.96)",
-                padding: "1.2rem 1.35rem 1.1rem",
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.9rem",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "baseline",
-                  gap: "0.75rem",
-                }}
-              >
-                <div>
-                  <h2
-                    style={{
-                      margin: 0,
-                      fontSize: "1rem",
-                    }}
-                  >
-                    📦 Plan généré
-                  </h2>
+                {error && (
                   <p
                     style={{
-                      margin: "0.25rem 0 0",
+                      marginTop: "0.4rem",
+                      color: "#f97373",
                       fontSize: "0.8rem",
-                      opacity: 0.75,
-                    }}
-                  >
-                    Résumé de ce backend + fichiers prêts à être copiés dans ton
-                    projet.
-                  </p>
-                </div>
-                {planSummary && (
-                  <span
-                    style={{
-                      fontSize: "0.75rem",
-                      opacity: 0.8,
-                      padding: "0.25rem 0.6rem",
+                      padding: "0.5rem 0.7rem",
+                      background: "rgba(127,29,29,0.35)",
                       borderRadius: "999px",
-                      border: "1px solid rgba(148,163,184,0.7)",
                     }}
                   >
-                    {planSummary}
-                  </span>
+                    ❌ {error}
+                  </p>
                 )}
+
               </div>
+            </section>
 
-              {plan && (
-                <>
-                  {/* Résumé stack */}
-                  <div
-                    style={{
-                      padding: "0.8rem 0.9rem",
-                      borderRadius: "10px",
-                      background:
-                        "radial-gradient(circle at top right,#1e1b4b,#020617)",
-                      border: "1px solid rgba(129,140,248,0.5)",
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: "0.8rem",
-                        opacity: 0.7,
-                      }}
-                    >
-                      Stack
-                    </div>
-                    <div style={{ fontWeight: 600, fontSize: "0.95rem" }}>
-                      {plan.stack}
-                    </div>
-                    <p
-                      style={{
-                        margin: "0.4rem 0 0",
-                        fontSize: "0.85rem",
-                        opacity: 0.9,
-                      }}
-                    >
-                      {plan.description}
-                    </p>
-                  </div>
-
-                  {/* Entités */}
-                  <div
-                    style={{
-                      padding: "0.8rem 0.9rem",
-                      borderRadius: "10px",
-                      background: "#020617",
-                      border: "1px solid rgba(148,163,184,0.45)",
-                    }}
-                  >
-                    <h3
-                      style={{
-                        margin: 0,
-                        marginBottom: "0.4rem",
-                        fontSize: "0.9rem",
-                      }}
-                    >
-                      📚 Entités ({plan.entities?.length || 0})
-                    </h3>
-                    {(!plan.entities || plan.entities.length === 0) && (
-                      <p
-                        style={{
-                          fontSize: "0.8rem",
-                          opacity: 0.7,
-                          margin: 0,
-                        }}
-                      >
-                        Aucune entité détectée.
-                      </p>
-                    )}
-                    {plan.entities?.map((entity) => (
-                      <div
-                        key={entity.name}
-                        style={{
-                          marginTop: "0.4rem",
-                          padding: "0.45rem 0.6rem",
-                          borderRadius: "8px",
-                          background: "rgba(15,23,42,0.9)",
-                        }}
-                      >
-                        <div style={{ fontWeight: 600, fontSize: "0.9rem" }}>
-                          {entity.name}
-                        </div>
-                        <ul
-                          style={{
-                            margin: "0.25rem 0 0",
-                            paddingLeft: "1.1rem",
-                            fontSize: "0.8rem",
-                          }}
-                        >
-                          {entity.fields?.map((field) => (
-                            <li key={field.name}>
-                              <code>{field.name}</code> : {field.type}
-                              {field.primary ? " · primary" : ""}
-                              {field.unique ? " · unique" : ""}
-                              {field.reference ? ` → ${field.reference}` : ""}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Routes */}
-                  <div
-                    style={{
-                      padding: "0.8rem 0.9rem",
-                      borderRadius: "10px",
-                      background: "#020617",
-                      border: "1px solid rgba(56,189,248,0.55)",
-                    }}
-                  >
-                    <h3
-                      style={{
-                        margin: 0,
-                        marginBottom: "0.4rem",
-                        fontSize: "0.9rem",
-                      }}
-                    >
-                      🧭 Routes ({plan.routes?.length || 0} groupes)
-                    </h3>
-                    {(!plan.routes || plan.routes.length === 0) && (
-                      <p
-                        style={{
-                          fontSize: "0.8rem",
-                          opacity: 0.7,
-                          margin: 0,
-                        }}
-                      >
-                        Aucune route décrite.
-                      </p>
-                    )}
-                    {plan.routes?.map((routeGroup) => (
-                      <div
-                        key={routeGroup.name}
-                        style={{
-                          marginTop: "0.4rem",
-                          padding: "0.45rem 0.6rem",
-                          borderRadius: "8px",
-                          background: "rgba(8,47,73,0.9)",
-                        }}
-                      >
-                        <div
-                          style={{
-                            fontWeight: 600,
-                            fontSize: "0.9rem",
-                          }}
-                        >
-                          {routeGroup.name}{" "}
-                          <span
-                            style={{
-                              opacity: 0.7,
-                              fontSize: "0.75rem",
-                            }}
-                          >
-                            ({routeGroup.basePath})
-                          </span>
-                        </div>
-                        <ul
-                          style={{
-                            margin: "0.25rem 0 0",
-                            paddingLeft: "1.1rem",
-                            fontSize: "0.8rem",
-                          }}
-                        >
-                          {routeGroup.endpoints?.map((ep, idx) => (
-                            <li key={idx}>
-                              <code>{ep.method}</code> {routeGroup.basePath}
-                              {ep.path} →{" "}
-                              <span style={{ opacity: 0.9 }}>{ep.handler}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-
-              {/* Fichiers + preview + copie */}
-              <div
+            {/* RESULTS BLOCK */}
+            {result && (
+              <section
                 style={{
-                  padding: "0.8rem 0.9rem",
-                  borderRadius: "10px",
-                  background: "#020617",
-                  border: "1px solid rgba(148,163,184,0.45)",
+                  borderRadius: "18px",
+                  border: "1px solid rgba(30,64,175,0.85)",
+                  background: "rgba(15,23,42,0.98)",
+                  padding: "1rem 1.1rem 1rem",
                   display: "flex",
                   flexDirection: "column",
-                  gap: "0.6rem",
-                }}
-              >
-                <h3
-                  style={{
-                    margin: 0,
-                    fontSize: "0.9rem",
-                  }}
-                >
-                  🗂 Fichiers générés ({files.length})
-                </h3>
-                {files.length === 0 && (
-                  <p
-                    style={{
-                      fontSize: "0.8rem",
-                      opacity: 0.7,
-                      margin: 0,
-                    }}
-                  >
-                    Aucun fichier n’a été renvoyé par l’API (mais le plan est
-                    prêt pour la génération côté backend).
-                  </p>
-                )}
-
-                <ul
-                  style={{
-                    margin: 0,
-                    paddingLeft: 0,
-                    listStyle: "none",
-                    fontSize: "0.8rem",
-                    maxHeight: "180px",
-                    overflow: "auto",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "0.25rem",
-                  }}
-                >
-                  {files.map((f) => {
-                    const ext = f.path.split(".").pop() || "";
-                    let typeLabel = "Fichier";
-                    if (f.path.includes("/models/")) typeLabel = "Model";
-                    else if (f.path.includes("/controllers/"))
-                      typeLabel = "Controller";
-                    else if (f.path.includes("/routes/")) typeLabel = "Route";
-                    else if (f.path.includes("/services/")) typeLabel = "Service";
-                    else if (f.path.includes("/config/")) typeLabel = "Config";
-                    else if (f.path.includes("server")) typeLabel = "Serveur";
-
-                    return (
-                      <li key={f.path}>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedFile(f)}
-                          style={{
-                            width: "100%",
-                            textAlign: "left",
-                            background:
-                              selectedFile?.path === f.path
-                                ? "rgba(37,99,235,0.3)"
-                                : "rgba(15,23,42,0.9)",
-                            borderRadius: "8px",
-                            border: "1px solid rgba(75,85,99,0.9)",
-                            padding: "0.35rem 0.55rem",
-                            cursor: "pointer",
-                            color: "inherit",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            gap: "0.4rem",
-                            fontFamily:
-                              "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
-                          }}
-                        >
-                          <span
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "0.4rem",
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontSize: "0.7rem",
-                                padding: "0.1rem 0.45rem",
-                                borderRadius: "999px",
-                                border:
-                                  "1px solid rgba(148,163,184,0.7)",
-                                opacity: 0.9,
-                              }}
-                            >
-                              {typeLabel}
-                            </span>
-                            <span
-                              style={{
-                                fontSize: "0.8rem",
-                              }}
-                            >
-                              {f.path}
-                            </span>
-                          </span>
-                          <span
-                            style={{
-                              fontSize: "0.7rem",
-                              opacity: 0.7,
-                              textTransform: "uppercase",
-                            }}
-                          >
-                            .{ext}
-                          </span>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-
-                {selectedFile && (
-                  <div
-                    style={{
-                      marginTop: "0.5rem",
-                      borderRadius: "8px",
-                      border: "1px solid rgba(148,163,184,0.7)",
-                      backgroundColor: "#020617",
-                      padding: "0.7rem",
-                      maxHeight: "260px",
-                      overflow: "auto",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        marginBottom: "0.5rem",
-                        gap: "0.75rem",
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontSize: "0.8rem",
-                          opacity: 0.85,
-                          fontFamily:
-                            "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
-                        }}
-                      >
-                        {selectedFile.path}
-                      </span>
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "0.4rem",
-                        }}
-                      >
-                        <button
-                          type="button"
-                          onClick={handleCopySelectedFile}
-                          style={{
-                            padding: "0.25rem 0.7rem",
-                            borderRadius: "999px",
-                            border: "1px solid rgba(148,163,184,0.8)",
-                            background: "rgba(15,23,42,0.95)",
-                            cursor: "pointer",
-                            fontSize: "0.75rem",
-                            fontWeight: 500,
-                            color: "rgba(226,232,240,0.95)",
-                          }}
-                        >
-                          Copier le fichier
-                        </button>
-                        <span
-                          style={{
-                            fontSize: "0.7rem",
-                            opacity: 0.7,
-                          }}
-                        >
-                          ou ⌘A / Ctrl+A puis ⌘C / Ctrl+C
-                        </span>
-                      </div>
-                    </div>
-                    <pre
-                      style={{
-                        margin: 0,
-                        fontSize: "0.8rem",
-                        lineHeight: 1.4,
-                        whiteSpace: "pre",
-                        overflowX: "auto",
-                      }}
-                    >
-                      <code>{selectedFile.content}</code>
-                    </pre>
-                    {copyMessage && (
-                      <p
-                        style={{
-                          marginTop: "0.4rem",
-                          fontSize: "0.8rem",
-                          opacity: 0.9,
-                          color: "#a5b4fc",
-                        }}
-                      >
-                        {copyMessage}
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* JSON brut + bouton copier */}
-              <div
-                style={{
-                  padding: "0.8rem 0.9rem",
-                  borderRadius: "10px",
-                  background: "#020617",
-                  border: "1px solid rgba(55,65,81,0.85)",
-                  marginTop: "0.1rem",
+                  gap: "0.9rem",
                 }}
               >
                 <div
                   style={{
                     display: "flex",
                     justifyContent: "space-between",
-                    alignItems: "center",
+                    alignItems: "baseline",
                     gap: "0.75rem",
+                  }}
+                >
+                  <div>
+                    <h2
+                      style={{
+                        margin: 0,
+                        fontSize: "0.98rem",
+                      }}
+                    >
+                      Plan généré
+                    </h2>
+                    <p
+                      style={{
+                        margin: "0.25rem 0 0",
+                        fontSize: "0.8rem",
+                        opacity: 0.78,
+                      }}
+                    >
+                      Résumé de ce backend + fichiers models/routes/services à
+                      coller dans ton projet.
+                    </p>
+                  </div>
+                  {planSummary && (
+                    <span
+                      style={{
+                        fontSize: "0.75rem",
+                        opacity: 0.85,
+                        padding: "0.25rem 0.6rem",
+                        borderRadius: "999px",
+                        border: "1px solid rgba(148,163,184,0.7)",
+                      }}
+                    >
+                      {planSummary}
+                    </span>
+                  )}
+                </div>
+
+                {plan && (
+                  <>
+                    {/* Stack résumé */}
+                    <div
+                      style={{
+                        padding: "0.8rem 0.9rem",
+                        borderRadius: "10px",
+                        background:
+                          "radial-gradient(circle at top right,#0f172a,#020617)",
+                        border: "1px solid rgba(37,99,235,0.7)",
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: "0.8rem",
+                          opacity: 0.75,
+                        }}
+                      >
+                        Stack
+                      </div>
+                      <div
+                        style={{
+                          fontWeight: 600,
+                          fontSize: "0.95rem",
+                        }}
+                      >
+                        {plan.stack}
+                      </div>
+                      <p
+                        style={{
+                          margin: "0.4rem 0 0",
+                          fontSize: "0.85rem",
+                          opacity: 0.9,
+                        }}
+                      >
+                        {plan.description}
+                      </p>
+                    </div>
+
+                    {/* Entités */}
+                    <div
+                      style={{
+                        padding: "0.8rem 0.9rem",
+                        borderRadius: "10px",
+                        background: "#020617",
+                        border: "1px solid rgba(148,163,184,0.45)",
+                      }}
+                    >
+                      <h3
+                        style={{
+                          margin: 0,
+                          marginBottom: "0.4rem",
+                          fontSize: "0.9rem",
+                        }}
+                      >
+                        📚 Entités ({plan.entities?.length || 0})
+                      </h3>
+                      {(!plan.entities || plan.entities.length === 0) && (
+                        <p
+                          style={{
+                            fontSize: "0.8rem",
+                            opacity: 0.7,
+                            margin: 0,
+                          }}
+                        >
+                          Aucune entité détectée.
+                        </p>
+                      )}
+                      {plan.entities?.map((entity) => (
+                        <div
+                          key={entity.name}
+                          style={{
+                            marginTop: "0.4rem",
+                            padding: "0.45rem 0.6rem",
+                            borderRadius: "8px",
+                            background: "rgba(15,23,42,0.96)",
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontWeight: 600,
+                              fontSize: "0.9rem",
+                            }}
+                          >
+                            {entity.name}
+                          </div>
+                          <ul
+                            style={{
+                              margin: "0.25rem 0 0",
+                              paddingLeft: "1.1rem",
+                              fontSize: "0.8rem",
+                            }}
+                          >
+                            {entity.fields?.map((field) => (
+                              <li key={field.name}>
+                                <code>{field.name}</code> : {field.type}
+                                {field.primary ? " · primary" : ""}
+                                {field.unique ? " · unique" : ""}
+                                {field.reference ? ` → ${field.reference}` : ""}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Routes */}
+                    <div
+                      style={{
+                        padding: "0.8rem 0.9rem",
+                        borderRadius: "10px",
+                        background: "#020617",
+                        border: "1px solid rgba(56,189,248,0.55)",
+                      }}
+                    >
+                      <h3
+                        style={{
+                          margin: 0,
+                          marginBottom: "0.4rem",
+                          fontSize: "0.9rem",
+                        }}
+                      >
+                        🧭 Routes ({plan.routes?.length || 0} groupes)
+                      </h3>
+                      {(!plan.routes || plan.routes.length === 0) && (
+                        <p
+                          style={{
+                            fontSize: "0.8rem",
+                            opacity: 0.7,
+                            margin: 0,
+                          }}
+                        >
+                          Aucune route décrite.
+                        </p>
+                      )}
+                      {plan.routes?.map((routeGroup) => (
+                        <div
+                          key={routeGroup.name}
+                          style={{
+                            marginTop: "0.4rem",
+                            padding: "0.45rem 0.6rem",
+                            borderRadius: "8px",
+                            background: "rgba(8,47,73,0.96)",
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontWeight: 600,
+                              fontSize: "0.9rem",
+                            }}
+                          >
+                            {routeGroup.name}{" "}
+                            <span
+                              style={{
+                                opacity: 0.7,
+                                fontSize: "0.75rem",
+                              }}
+                            >
+                              ({routeGroup.basePath})
+                            </span>
+                          </div>
+                          <ul
+                            style={{
+                              margin: "0.25rem 0 0",
+                              paddingLeft: "1.1rem",
+                              fontSize: "0.8rem",
+                            }}
+                          >
+                            {routeGroup.endpoints?.map((ep, idx) => (
+                              <li key={idx}>
+                                <code>{ep.method}</code> {routeGroup.basePath}
+                                {ep.path} →{" "}
+                                <span style={{ opacity: 0.9 }}>
+                                  {ep.handler}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {/* Fichiers + preview */}
+                <div
+                  style={{
+                    padding: "0.8rem 0.9rem",
+                    borderRadius: "10px",
+                    background: "#020617",
+                    border: "1px solid rgba(148,163,184,0.45)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.6rem",
                   }}
                 >
                   <h3
@@ -2000,78 +2375,300 @@ function App() {
                       fontSize: "0.9rem",
                     }}
                   >
-                    🧪 JSON brut (debug)
+                    🗂 Fichiers générés ({files.length})
                   </h3>
+                  {files.length === 0 && (
+                    <p
+                      style={{
+                        fontSize: "0.8rem",
+                        opacity: 0.7,
+                        margin: 0,
+                      }}
+                    >
+                      Aucun fichier n’a été renvoyé par l’API (mais le plan est
+                      prêt pour la génération côté backend).
+                    </p>
+                  )}
+
+                  <ul
+                    style={{
+                      margin: 0,
+                      paddingLeft: 0,
+                      listStyle: "none",
+                      fontSize: "0.8rem",
+                      maxHeight: "180px",
+                      overflow: "auto",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.25rem",
+                    }}
+                  >
+                    {files.map((f) => {
+                      const ext = f.path.split(".").pop() || "";
+                      let typeLabel = "Fichier";
+                      if (f.path.includes("/models/")) typeLabel = "Model";
+                      else if (f.path.includes("/controllers/"))
+                        typeLabel = "Controller";
+                      else if (f.path.includes("/routes/")) typeLabel = "Route";
+                      else if (f.path.includes("/services/"))
+                        typeLabel = "Service";
+                      else if (f.path.includes("/config/")) typeLabel = "Config";
+                      else if (f.path.includes("server")) typeLabel = "Serveur";
+
+                      return (
+                        <li key={f.path}>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedFile(f)}
+                            style={{
+                              width: "100%",
+                              textAlign: "left",
+                              background:
+                                selectedFile?.path === f.path
+                                  ? "rgba(37,99,235,0.35)"
+                                  : "rgba(15,23,42,0.98)",
+                              borderRadius: "8px",
+                              border: "1px solid rgba(75,85,99,0.9)",
+                              padding: "0.35rem 0.55rem",
+                              cursor: "pointer",
+                              color: "inherit",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              gap: "0.4rem",
+                              fontFamily:
+                                "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
+                            }}
+                          >
+                            <span
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "0.4rem",
+                              }}
+                            >
+                              <span
+                                style={{
+                                  fontSize: "0.7rem",
+                                  padding: "0.1rem 0.45rem",
+                                  borderRadius: "999px",
+                                  border: "1px solid rgba(148,163,184,0.7)",
+                                  opacity: 0.9,
+                                }}
+                              >
+                                {typeLabel}
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: "0.8rem",
+                                }}
+                              >
+                                {f.path}
+                              </span>
+                            </span>
+                            <span
+                              style={{
+                                fontSize: "0.7rem",
+                                opacity: 0.7,
+                                textTransform: "uppercase",
+                              }}
+                            >
+                              .{ext}
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+
+                  {selectedFile && (
+                    <div
+                      style={{
+                        marginTop: "0.5rem",
+                        borderRadius: "8px",
+                        border: "1px solid rgba(148,163,184,0.7)",
+                        backgroundColor: "#020617",
+                        padding: "0.7rem",
+                        maxHeight: "260px",
+                        overflow: "auto",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          marginBottom: "0.5rem",
+                          gap: "0.75rem",
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: "0.8rem",
+                            opacity: 0.85,
+                            fontFamily:
+                              "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
+                          }}
+                        >
+                          {selectedFile.path}
+                        </span>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.4rem",
+                          }}
+                        >
+                          <button
+                            type="button"
+                            onClick={handleCopySelectedFile}
+                            style={{
+                              padding: "0.25rem 0.7rem",
+                              borderRadius: "999px",
+                              border: "1px solid rgba(148,163,184,0.8)",
+                              background: "rgba(15,23,42,0.95)",
+                              cursor: "pointer",
+                              fontSize: "0.75rem",
+                              fontWeight: 500,
+                              color: "rgba(226,232,240,0.95)",
+                            }}
+                          >
+                            Copier le fichier
+                          </button>
+                          <span
+                            style={{
+                              fontSize: "0.7rem",
+                              opacity: 0.7,
+                            }}
+                          >
+                            ou ⌘A / Ctrl+A puis ⌘C / Ctrl+C
+                          </span>
+                        </div>
+                      </div>
+                      <pre
+                        style={{
+                          margin: 0,
+                          fontSize: "0.8rem",
+                          lineHeight: 1.4,
+                          whiteSpace: "pre",
+                          overflowX: "auto",
+                        }}
+                      >
+                        <code>{selectedFile.content}</code>
+                      </pre>
+                      {copyMessage && (
+                        <p
+                          style={{
+                            marginTop: "0.4rem",
+                            fontSize: "0.8rem",
+                            opacity: 0.9,
+                            color: "#a5b4fc",
+                          }}
+                        >
+                          {copyMessage}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* JSON brut */}
+                <div
+                  style={{
+                    padding: "0.8rem 0.9rem",
+                    borderRadius: "10px",
+                    background: "#020617",
+                    border: "1px solid rgba(55,65,81,0.85)",
+                    marginTop: "0.1rem",
+                  }}
+                >
                   <div
                     style={{
                       display: "flex",
+                      justifyContent: "space-between",
                       alignItems: "center",
-                      gap: "0.5rem",
+                      gap: "0.75rem",
                     }}
                   >
-                    <button
-                      type="button"
-                      onClick={() => setShowRawResult((prev) => !prev)}
+                    <h3
                       style={{
-                        padding: "0.25rem 0.7rem",
-                        borderRadius: "999px",
-                        border: "1px solid rgba(148,163,184,0.7)",
-                        background: "rgba(15,23,42,0.95)",
-                        cursor: "pointer",
-                        fontSize: "0.75rem",
-                        fontWeight: 500,
-                        color: "rgba(226,232,240,0.95)",
+                        margin: 0,
+                        fontSize: "0.9rem",
                       }}
                     >
-                      {showRawResult ? "Masquer" : "Afficher"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleCopyRawResult}
+                      🧪 JSON brut (debug)
+                    </h3>
+                    <div
                       style={{
-                        padding: "0.25rem 0.7rem",
-                        borderRadius: "999px",
-                        border: "1px solid rgba(129,140,248,0.9)",
-                        background: "rgba(30,64,175,0.7)",
-                        cursor: "pointer",
-                        fontSize: "0.75rem",
-                        fontWeight: 500,
-                        color: "white",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.5rem",
                       }}
                     >
-                      Copier le JSON
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowRawResult((prev) => !prev)}
+                        style={{
+                          padding: "0.25rem 0.7rem",
+                          borderRadius: "999px",
+                          border: "1px solid rgba(148,163,184,0.7)",
+                          background: "rgba(15,23,42,0.95)",
+                          cursor: "pointer",
+                          fontSize: "0.75rem",
+                          fontWeight: 500,
+                          color: "rgba(226,232,240,0.95)",
+                        }}
+                      >
+                        {showRawResult ? "Masquer" : "Afficher"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCopyRawResult}
+                        style={{
+                          padding: "0.25rem 0.7rem",
+                          borderRadius: "999px",
+                          border: "1px solid rgba(34,197,94,0.9)",
+                          background: "rgba(6,95,70,0.9)",
+                          cursor: "pointer",
+                          fontSize: "0.75rem",
+                          fontWeight: 500,
+                          color: "#ecfeff",
+                        }}
+                      >
+                        Copier le JSON
+                      </button>
+                    </div>
                   </div>
+                  {showRawResult && (
+                    <pre
+                      style={{
+                        margin: "0.5rem 0 0",
+                        fontSize: "0.8rem",
+                        lineHeight: 1.4,
+                        whiteSpace: "pre",
+                        overflowX: "auto",
+                        maxHeight: "260px",
+                      }}
+                    >
+                      <code>{JSON.stringify(result, null, 2)}</code>
+                    </pre>
+                  )}
+                  {rawCopyMessage && (
+                    <p
+                      style={{
+                        marginTop: "0.4rem",
+                        fontSize: "0.8rem",
+                        opacity: 0.9,
+                        color: "#a5b4fc",
+                      }}
+                    >
+                      {rawCopyMessage}
+                    </p>
+                  )}
                 </div>
-                {showRawResult && (
-                  <pre
-                    style={{
-                      margin: "0.5rem 0 0",
-                      fontSize: "0.8rem",
-                      lineHeight: 1.4,
-                      whiteSpace: "pre",
-                      overflowX: "auto",
-                      maxHeight: "260px",
-                    }}
-                  >
-                    <code>{JSON.stringify(result, null, 2)}</code>
-                  </pre>
-                )}
-                {rawCopyMessage && (
-                  <p
-                    style={{
-                      marginTop: "0.4rem",
-                      fontSize: "0.8rem",
-                      opacity: 0.9,
-                      color: "#a5b4fc",
-                    }}
-                  >
-                    {rawCopyMessage}
-                  </p>
-                )}
-              </div>
-            </section>
-          )}
+              </section>
+            )}
+          </section>
         </div>
       </main>
     </div>
