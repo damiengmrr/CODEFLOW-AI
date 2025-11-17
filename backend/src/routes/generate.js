@@ -18,9 +18,12 @@ function getGroqClient() {
   return new Groq({ apiKey });
 }
 
+/**
+ * Nettoie une réponse potentielle contenant des blocs markdown ```json ... ``` etc.
+ */
 function cleanJSON(raw) {
   if (!raw) return "";
-  return raw
+  return String(raw)
     .replace(/```json/gi, "")
     .replace(/```/g, "")
     .trim();
@@ -113,8 +116,8 @@ ${fieldsInit}
 
 // GET /api/generate -> message d'aide (pour tests dans le navigateur)
 router.get("/", (req, res) => {
-  res.json({
-    info: 'Utilise POST /api/generate avec un body JSON du type { "prompt": "..." }'
+  return res.json({
+    info: 'Utilise POST /api/generate avec un body JSON du type { "prompt": "..." }',
   });
 });
 
@@ -123,9 +126,9 @@ router.post("/", async (req, res) => {
   try {
     const { prompt } = req.body;
 
-    if (!prompt) {
+    if (!prompt || typeof prompt !== "string") {
       return res.status(400).json({
-        error: 'Prompt manquant. Envoie { "prompt": "..." } dans le body.'
+        error: 'Prompt manquant ou invalide. Envoie { "prompt": "..." } dans le body.',
       });
     }
 
@@ -172,7 +175,9 @@ Structure attendue du JSON :
     }
   ]
 }
-Ne mets JAMAIS de blocs de code Markdown (par exemple un bloc json) ou tout autre délimiteur de code dans ta réponse. Réponds uniquement avec le JSON brut.
+
+Ne mets JAMAIS de blocs de code Markdown (par exemple un bloc \`\`\`json) ou tout autre délimiteur de code dans ta réponse.
+Réponds uniquement avec le JSON brut.
           `.trim(),
         },
         {
@@ -181,11 +186,18 @@ Ne mets JAMAIS de blocs de code Markdown (par exemple un bloc json) ou tout autr
         },
       ],
       temperature: 0.2,
+      max_tokens: 2048,
     });
 
-    const output = completion.choices?.[0]?.message?.content ?? "";
+    const rawContent = completion?.choices?.[0]?.message?.content ?? "";
 
-    const cleanedOutput = cleanJSON(output);
+    const cleanedOutput = cleanJSON(
+      typeof rawContent === "string"
+        ? rawContent
+        : Array.isArray(rawContent)
+        ? rawContent.map((part) => part?.text ?? "").join("")
+        : ""
+    );
 
     let parsed;
     try {
@@ -201,7 +213,7 @@ Ne mets JAMAIS de blocs de code Markdown (par exemple un bloc json) ou tout autr
     // Génération de fichiers de code basiques à partir du plan
     const files = generateFilesFromPlan(parsed);
 
-    res.json({
+    return res.json({
       success: true,
       plan: parsed,
       files,
@@ -209,7 +221,7 @@ Ne mets JAMAIS de blocs de code Markdown (par exemple un bloc json) ou tout autr
   } catch (error) {
     console.error("Erreur dans /api/generate:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       error: "Erreur lors de l'appel à Groq",
       message: error?.message ?? null,
       type: error?.name ?? null,
