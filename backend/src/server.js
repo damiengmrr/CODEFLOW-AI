@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import generateRoute from "./routes/generate.js";
 
 dotenv.config();
 
@@ -14,9 +15,7 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok", service: "CodeFlow AI backend" });
 });
 
-app.get("/", (req, res) => {
-    res.send("Bienvenue sur l'API CodeFlow AI 🚀");
-  });
+app.use("/api/generate", generateRoute);
 
 app.listen(PORT, () => {
   console.log(`🚀 CodeFlow AI backend running on http://localhost:${PORT}`);
