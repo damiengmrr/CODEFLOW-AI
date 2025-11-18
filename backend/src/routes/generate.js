@@ -1,5 +1,6 @@
 import express from "express";
 import Groq from "groq-sdk";
+import archiver from "archiver";
 
 const router = express.Router();
 
@@ -655,6 +656,160 @@ Réponds uniquement avec le JSON brut.
       status: error?.status ?? null,
       type: error?.name ?? null,
     });
+  }
+});
+
+// POST /api/generate/zip -> même génération, mais renvoie un ZIP téléchargeable
+router.post("/zip", async (req, res) => {
+  try {
+    const { prompt } = req.body;
+
+    if (!prompt || typeof prompt !== "string") {
+      return res.status(400).json({
+        error:
+          'Prompt manquant ou invalide. Envoie { "prompt": "..." } dans le body.',
+      });
+    }
+
+    const groq = getGroqClient();
+
+    const completion = await groq.chat.completions.create({
+      model: process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
+      messages: [
+        {
+          role: "system",
+          content: `
+Tu es un assistant spécialisé qui génère des plans d'architecture pour des backends Node.js.
+
+Tu dois TOUJOURS répondre UNIQUEMENT avec un JSON strictement valide.
+Pas de texte avant, pas de texte après, pas de commentaires.
+
+Structure attendue du JSON :
+{
+  "stack": "string (ex: \\"node-express-postgres\\")",
+  "description": "courte description du backend",
+  "entities": [
+    {
+      "name": "NomDuModel",
+      "fields": [
+        { "name": "nom", "type": "string|number|boolean|date|uuid", "primary": bool, "unique": bool }
+      ]
+    }
+  ],
+  "routes": [
+    {
+      "name": "nomDuGroupe",
+      "basePath": "/path",
+      "endpoints": [
+        { "method": "GET|POST|PUT|DELETE", "path": "/subpath", "handler": "nomHandler" }
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "src/chemin/fichier.js",
+      "type": "server|route|controller|service|config|model",
+      "description": "rôle du fichier"
+    }
+  ]
+}
+
+Ne mets JAMAIS de blocs de code Markdown (par exemple un bloc \`\`\`json) ou tout autre délimiteur de code dans ta réponse.
+Réponds uniquement avec le JSON brut.
+          `.trim(),
+        },
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+      temperature: 0.2,
+      max_tokens: 2048,
+    });
+
+    const rawContent = completion?.choices?.[0]?.message?.content ?? "";
+
+    const cleanedOutput = cleanJSON(
+      typeof rawContent === "string"
+        ? rawContent
+        : Array.isArray(rawContent)
+        ? rawContent.map((part) => part?.text ?? "").join("")
+        : ""
+    );
+
+    let parsed;
+    try {
+      parsed = JSON.parse(cleanedOutput);
+    } catch (e) {
+      console.error("Réponse Groq non JSON (ZIP):", cleanedOutput);
+      return res.status(500).json({
+        error: "Réponse IA non JSON",
+        raw: cleanedOutput,
+      });
+    }
+
+    // Génération de fichiers à partir du plan
+    const files = generateFilesFromPlan(parsed);
+
+    const filenameSlug =
+      toKebabCase(
+        parsed.projectName || parsed.name || parsed.stack || "codeflow-backend"
+      ) || "codeflow-backend";
+
+    // Prépare la réponse HTTP pour un téléchargement de ZIP
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${filenameSlug}.zip"`
+    );
+
+    const archive = archiver("zip", { zlib: { level: 9 } });
+
+    archive.on("error", (err) => {
+      console.error("Erreur lors de la génération du ZIP :", err);
+      if (!res.headersSent) {
+        res.status(500).json({
+          error: "Erreur lors de la génération du ZIP",
+          message: err.message || null,
+        });
+      } else {
+        res.end();
+      }
+    });
+
+    // On pipe le ZIP directement vers la réponse HTTP
+    archive.pipe(res);
+
+    // Ajout de chaque fichier généré dans l'archive
+    files.forEach((file) => {
+      const content = file.content ?? "";
+      const filePath = file.path || "file.txt";
+      archive.append(content, { name: filePath });
+    });
+
+    // Finalise le ZIP (envoie la fin du flux)
+    archive.finalize();
+  } catch (error) {
+    console.error("Erreur dans /api/generate/zip:", error);
+
+    const rawMessage = error?.message ?? "";
+    const looksLikeHtml =
+      typeof rawMessage === "string" && rawMessage.includes("<!DOCTYPE html>");
+
+    const safeMessage = looksLikeHtml
+      ? "Le service Groq est temporairement indisponible (erreur 500 côté fournisseur). Réessaie dans quelques minutes."
+      : rawMessage;
+
+    if (!res.headersSent) {
+      return res.status(500).json({
+        error: "Erreur lors de l'appel à Groq ou lors de la génération du ZIP",
+        message: safeMessage || null,
+        status: error?.status ?? null,
+        type: error?.name ?? null,
+      });
+    } else {
+      res.end();
+    }
   }
 });
 

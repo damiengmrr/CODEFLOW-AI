@@ -42,6 +42,8 @@ function App() {
   const [copyMessage, setCopyMessage] = useState("");
   const [showRawResult, setShowRawResult] = useState(false);
   const [rawCopyMessage, setRawCopyMessage] = useState("");
+  const [zipLoading, setZipLoading] = useState(false);
+  const [zipMessage, setZipMessage] = useState("");
 
   const hasResult = !!result;
   const plan = result?.plan;
@@ -111,6 +113,49 @@ function App() {
       setError(err.message || "Erreur inconnue");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDownloadZip = async () => {
+    setZipMessage("");
+    try {
+      setZipLoading(true);
+      const response = await fetch("http://localhost:4000/api/generate/zip", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || "Erreur lors de la génération du ZIP");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+
+      const safeSlug = (prompt || "codeflow-backend")
+        .slice(0, 40)
+        .toLowerCase()
+        .replace(/[^a-z0-9-_]+/g, "-");
+
+      a.href = url;
+      a.download = `${safeSlug || "codeflow-backend"}-${Date.now()}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
+      setZipMessage("Archive ZIP téléchargée ✅");
+      setTimeout(() => setZipMessage(""), 3000);
+    } catch (err) {
+      console.error(err);
+      setZipMessage(
+        err?.message || "Erreur pendant le téléchargement du ZIP"
+      );
+    } finally {
+      setZipLoading(false);
     }
   };
 
@@ -332,27 +377,54 @@ function App() {
           </button>
         </div>
 
-        <button
-          onClick={handleGenerate}
-          disabled={loading}
+        <div
           style={{
-            padding: "0.6rem 1.4rem",
-            borderRadius: "999px",
-            border: "none",
-            background: loading
-              ? "rgba(0,122,204,0.4)"
-              : "linear-gradient(135deg,#22c55e,#0ea5e9)",
-            color: "#ecfeff",
-            cursor: loading ? "default" : "pointer",
-            fontWeight: 600,
-            fontSize: "0.9rem",
-            boxShadow:
-              "0 10px 30px rgba(34,197,94,0.55), 0 0 20px rgba(14,165,233,0.55)",
+            display: "flex",
+            gap: "0.5rem",
+            alignItems: "center",
             flexShrink: 0,
           }}
         >
-          {loading ? "Génération..." : "Générer 🔥"}
-        </button>
+          <button
+            onClick={handleGenerate}
+            disabled={loading}
+            style={{
+              padding: "0.6rem 1.4rem",
+              borderRadius: "999px",
+              border: "none",
+              background: loading
+                ? "rgba(0,122,204,0.4)"
+                : "linear-gradient(135deg,#22c55e,#0ea5e9)",
+              color: "#ecfeff",
+              cursor: loading ? "default" : "pointer",
+              fontWeight: 600,
+              fontSize: "0.9rem",
+              boxShadow:
+                "0 10px 30px rgba(34,197,94,0.55), 0 0 20px rgba(14,165,233,0.55)",
+            }}
+          >
+            {loading ? "Génération..." : "Générer 🔥"}
+          </button>
+          <button
+            type="button"
+            onClick={handleDownloadZip}
+            disabled={zipLoading || loading}
+            style={{
+              padding: "0.6rem 1.1rem",
+              borderRadius: "999px",
+              border: `1px solid ${theme.border}`,
+              background: zipLoading
+                ? "rgba(15,23,42,0.8)"
+                : "rgba(15,23,42,0.95)",
+              color: zipLoading ? "#9ca3af" : "#e5e7eb",
+              cursor: zipLoading || loading ? "default" : "pointer",
+              fontWeight: 500,
+              fontSize: "0.85rem",
+            }}
+          >
+            {zipLoading ? "Préparation du ZIP..." : "Exporter en .zip"}
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -367,6 +439,20 @@ function App() {
           }}
         >
           ❌ {error}
+        </p>
+      )}
+      {zipMessage && (
+        <p
+          style={{
+            marginTop: "0.25rem",
+            color: "#a5b4fc",
+            fontSize: "0.8rem",
+            padding: "0.4rem 0.7rem",
+            background: "rgba(30,64,175,0.35)",
+            borderRadius: "999px",
+          }}
+        >
+          {zipMessage}
         </p>
       )}
     </div>
