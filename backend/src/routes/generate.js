@@ -437,12 +437,44 @@ export async function remove(id) {
     });
   });
 
-  // --- README minimal dans le projet généré -----------------------------
+  // --- README adaptatif selon entités et routes -----------------------------
+  const entitiesSection = entities.length
+    ? entities
+        .map((e) => {
+          const fields = Array.isArray(e.fields) ? e.fields : [];
+          const fieldList = fields
+            .map((f) => `- \`${f.name}\` (${f.type || "string"})`)
+            .join("\n");
+
+          return `### ${e.name}\n\nNombre de champs : ${fields.length}\n\n${fieldList}`;
+        })
+        .join("\n\n")
+    : "_Aucune entité définie dans le plan._";
+
+  const routesSection = routeGroups.length
+    ? routeGroups
+        .map((group) => {
+          const endpoints = Array.isArray(group.endpoints) ? group.endpoints : [];
+          const endpointList = endpoints
+            .map(
+              (ep) =>
+                `- **${(ep.method || "GET").toUpperCase()}** \`${group.basePath || ""}${ep.path || "/"}\` → \`${ep.handler || "handler"}\``
+            )
+            .join("\n");
+
+          return `### ${group.name}\n\nBase path : \`${group.basePath || "/"}\`\n\n${endpointList}`;
+        })
+        .join("\n\n")
+    : "_Aucune route déclarée dans le plan._";
+
   const readmeContent = `# Backend généré avec CODEFLOW-AI
 
-Ce dossier contient un backend Node.js / Express généré automatiquement à partir d'une simple description.
+Ce dossier contient un backend **Node.js / Express** généré automatiquement à partir d'une simple description.
 
-## Démarrage rapide
+- **Stack** : ${String(plan.stack || "node-express-postgres")}
+- **Description** : ${String(plan.description || "Backend généré automatiquement par CODEFLOW-AI.")}
+
+## 🚀 Démarrage rapide
 
 1. Installe les dépendances :
 
@@ -464,17 +496,32 @@ Ce dossier contient un backend Node.js / Express généré automatiquement à pa
 
 Le serveur démarre par défaut sur \`http://localhost:5000\`.
 
-## Ce qui est généré
+## 🧱 Architecture générée
 
-- Un serveur Express prêt à l'emploi (\`src/server.js\`)
-- Une configuration PostgreSQL (\`src/config/database.js\`)
-- Une configuration JWT (\`src/config/auth.js\`)
-- Un système de routes modulaire (\`src/routes/*.js\` + \`src/routes/index.js\`)
-- Des contrôleurs pour chaque groupe de routes (\`src/controllers/*.js\`)
-- Des modèles et services pour chaque entité déclarée dans le plan (\`src/models/*.js\`, \`src/services/*.js\`)
-- Des middlewares d'erreur et de 404 (\`src/middlewares/*.js\`)
+- Serveur Express prêt à l'emploi : \`src/server.js\`
+- Configuration PostgreSQL : \`src/config/database.js\`
+- Configuration JWT : \`src/config/auth.js\`
+- Système de routes modulaire : \`src/routes/*.js\` + \`src/routes/index.js\`
+- Contrôleurs pour chaque groupe de routes : \`src/controllers/*.js\`
+- Modèles et services pour chaque entité : \`src/models/*.js\`, \`src/services/*.js\`
+- Middlewares d'erreur et 404 : \`src/middlewares/*.js\`
 
-Tu peux ensuite brancher ce backend à ton propre projet, adapter les modèles/services, et enrichir les contrôleurs avec ta logique métier.
+## 📌 Entités générées
+
+${entitiesSection}
+
+## 🌐 Routes générées
+
+${routesSection}
+
+---
+
+Tu peux maintenant :
+
+- Adapter les modèles/services à ta base réelle,
+- Compléter les contrôleurs avec ta logique métier,
+- Brancher ce backend à un frontend (React, Next, Vue, etc.),
+- Ou l'intégrer tel quel comme base solide pour ton projet.
 `;
   files.push({
     path: "README.md",
