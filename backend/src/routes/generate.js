@@ -22,11 +22,20 @@ function getGroqClient() {
 /**
  * Nettoie une réponse potentielle contenant des blocs markdown ```json ... ``` etc.
  */
+
 function cleanJSON(raw) {
   if (!raw) return "";
   return String(raw)
     .replace(/```json/gi, "")
     .replace(/```/g, "")
+    .trim();
+}
+
+function cleanCode(raw) {
+  if (!raw) return "";
+  return String(raw)
+    // supprime d'éventuels blocs ```lang ou ``` en début/fin
+    .replace(/```[a-zA-Z]*/g, "")
     .trim();
 }
 
@@ -112,6 +121,30 @@ JWT_SECRET=change-me-in-production
   files.push({
     path: ".env.example",
     content: envExample,
+  });
+
+  // --- docker-compose.yml pour PostgreSQL -------------------------------
+  const dockerCompose = `version: "3.9"
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: app
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+volumes:
+  db_data:
+`;
+  files.push({
+    path: "docker-compose.yml",
+    content: dockerCompose,
   });
 
   // --- src/config/database.js -------------------------------------------
@@ -275,16 +308,30 @@ ${routesIndexBody}}
     const controllerFile = `src/controllers/${controllerName}.js`;
     const routeFile = `src/routes/${fileSlug}.js`;
 
-    const endpoints = Array.isArray(group.endpoints)
-      ? group.endpoints
-      : [];
+    const endpoints = Array.isArray(group.endpoints) ? group.endpoints : [];
+
+    // Essaie d'associer ce groupe de routes à une entité (pour générer un CRUD plus complet)
+    const linkedEntity =
+      entities.find((e) => {
+        return (
+          toTableName(e.name) === toTableName(groupName) ||
+          toKebabCase(e.name) === toKebabCase(groupName)
+        );
+      }) || null;
+
+    const serviceImportName = linkedEntity
+      ? `${toCamelCase(linkedEntity.name)}Service`
+      : null;
+    const serviceImportPath = linkedEntity
+      ? `../services/${toCamelCase(linkedEntity.name)}Service.js`
+      : null;
 
     // Route file
     let routeContent = `import { Router } from "express";
-import * as ${controllerName} from "../controllers/${controllerName}.js";
+  import * as ${controllerName} from "../controllers/${controllerName}.js";
 
-const router = Router();
-`;
+  const router = Router();
+  `;
 
     endpoints.forEach((ep) => {
       if (!ep || !ep.method || !ep.path) return;
@@ -295,14 +342,14 @@ const router = Router();
           : `${method}${toPascalCase(ep.path || "Handler")}Handler`;
 
       routeContent += `
-router.${method}("${ep.path}", ${controllerName}.${handler});
-`;
+  router.${method}("${ep.path}", ${controllerName}.${handler});
+  `;
     });
 
     routeContent += `
 
-export default router;
-`;
+  export default router;
+  `;
 
     files.push({
       path: routeFile,
@@ -311,38 +358,109 @@ export default router;
 
     // Controller file
     let controllerContent = `// Contrôleur généré pour le groupe de routes "${groupName}"
-// Chaque handler délègue la logique métier à un service dédié (à créer dans src/services).
+  `;
+
+    if (serviceImportName && serviceImportPath && linkedEntity) {
+      controllerContent += `// Ce contrôleur est relié au service de l'entité "${linkedEntity.name}".
+  import * as ${serviceImportName} from "${serviceImportPath}";
+
+  `;
+    } else {
+      controllerContent += `// Aucun service spécifique n'a été détecté pour ce groupe.
+// Tu peux créer un fichier dans src/services/ et l'importer ici.
 
 `;
+    }
 
     endpoints.forEach((ep) => {
       if (!ep || !ep.method || !ep.path) return;
       const method = String(ep.method || "get").toLowerCase();
+      const path = ep.path || "/";
       const handler =
         ep.handler && /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(ep.handler)
           ? ep.handler
           : `${method}${toPascalCase(ep.path || "Handler")}Handler`;
 
+      const isList =
+        method === "get" && (path === "/" || path === "");
+      const isGetById =
+        method === "get" && /:id/.test(path);
+      const isCreate =
+        method === "post" && (path === "/" || path === "");
+      const isUpdate =
+        (method === "put" || method === "patch") && /:id/.test(path);
+      const isDelete =
+        method === "delete" && /:id/.test(path);
+
       controllerContent += `export async function ${handler}(req, res, next) {
-  try {
-    // TODO: appeler la couche service correspondante et renvoyer la réponse
-    // Exemple:
-    // const data = await myService.doSomething(req);
-    // return res.json(data);
+    try {
+  `;
 
-    return res.status(501).json({
-      message: "Handler '${handler}' non implémenté pour le moment.",
-    });
-  } catch (error) {
-    next(error);
+      if (serviceImportName) {
+        if (isList) {
+          controllerContent += `      const data = await ${serviceImportName}.findAll();
+      return res.json(data);
+  `;
+        } else if (isGetById) {
+          controllerContent += `      const { id } = req.params;
+      const item = await ${serviceImportName}.findById(id);
+      if (!item) {
+        return res.status(404).json({ error: "Ressource introuvable" });
+      }
+      return res.json(item);
+  `;
+        } else if (isCreate) {
+          controllerContent += `      const created = await ${serviceImportName}.create(req.body);
+      return res.status(201).json(created);
+  `;
+        } else if (isUpdate) {
+          controllerContent += `      const { id } = req.params;
+      // 💡 À implémenter dans le service : update(id, data)
+      const updated = ${serviceImportName}.update
+        ? await ${serviceImportName}.update(id, req.body)
+        : null;
+
+      if (!updated) {
+        return res.status(501).json({
+          message: "La fonction update() n'est pas encore implémentée dans le service.",
+        });
+      }
+
+      return res.json(updated);
+  `;
+        } else if (isDelete) {
+          controllerContent += `      const { id } = req.params;
+      await ${serviceImportName}.remove(id);
+      return res.status(204).send();
+  `;
+        } else {
+          controllerContent += `      // TODO: implémenter la logique spécifique pour ce handler
+      // Tu peux utiliser le service ${serviceImportName} ici.
+      return res.status(501).json({
+        message: "Handler '${handler}' non implémenté pour le moment.",
+      });
+  `;
+        }
+      } else {
+        controllerContent += `      // TODO: implémenter ce handler.
+      // Aucun service n'a été détecté automatiquement pour ce groupe de routes.
+      return res.status(501).json({
+        message: "Handler '${handler}' non implémenté pour le moment.",
+      });
+  `;
+      }
+
+      controllerContent += `    } catch (error) {
+      next(error);
+    }
   }
-}
 
-`;
+  `;
     });
 
     if (!endpoints.length) {
-      controllerContent += `// Aucune route déclarée pour ce groupe pour le moment.\n`;
+      controllerContent += `// Aucune route déclarée pour ce groupe pour le moment.
+  `;
     }
 
     files.push({
@@ -496,6 +614,16 @@ Ce dossier contient un backend **Node.js / Express** généré automatiquement �
    \`\`\`
 
 Le serveur démarre par défaut sur \`http://localhost:5000\`.
+
+## 🐳 Optionnel : démarrer PostgreSQL avec Docker
+
+Si tu n'as pas encore de base PostgreSQL locale, tu peux utiliser le \`docker-compose.yml\` généré :
+
+\`\`\`bash
+docker-compose up -d
+\`\`\`
+
+Cela démarre un conteneur Postgres accessible sur le port \`5432\` avec les mêmes identifiants que dans \`.env.example\`.
 
 ## 🧱 Architecture générée
 
@@ -652,6 +780,125 @@ Réponds uniquement avec le JSON brut.
 
     return res.status(500).json({
       error: "Erreur lors de l'appel à Groq",
+      message: safeMessage || null,
+      status: error?.status ?? null,
+      type: error?.name ?? null,
+    });
+  }
+});
+
+// POST /api/generate/refactor-file: refactorise un fichier selon une instruction
+router.post("/refactor-file", async (req, res) => {
+  try {
+    const { filePath, fileContent, instruction } = req.body || {};
+
+    if (!filePath || typeof filePath !== "string") {
+      return res.status(400).json({
+        error: 'filePath manquant ou invalide. Exemple: "src/routes/users.js".',
+      });
+    }
+
+    if (typeof fileContent !== "string" || !fileContent.trim()) {
+      return res.status(400).json({
+        error:
+          "fileContent manquant ou vide. Envoie le contenu actuel complet du fichier à modifier.",
+      });
+    }
+
+    if (!instruction || typeof instruction !== "string") {
+      return res.status(400).json({
+        error:
+          "instruction manquante ou invalide. Donne une consigne claire, par exemple: 'ajoute une route /users qui renvoie la liste des utilisateurs'.",
+      });
+    }
+
+    const groq = getGroqClient();
+
+    const completion = await groq.chat.completions.create({
+      model: process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
+      temperature: 0.2,
+      max_tokens: 4096,
+      messages: [
+        {
+          role: "system",
+          content: `
+Tu es un assistant spécialisé dans la refactorisation de fichiers de code backend (Node.js, Express, JavaScript / TypeScript, config, etc.).
+
+On te fournit:
+- le chemin textuel du fichier (filePath),
+- le contenu actuel COMPLET du fichier (fileContent),
+- une instruction de modification (instruction).
+
+Ta mission:
+- Retourner UNIQUEMENT le NOUVEAU contenu COMPLET du fichier, prêt à être sauvegardé tel quel.
+- NE PAS ajouter de commentaires superflus, d'explications, ni de texte autour.
+- NE PAS ajouter de blocs de code Markdown (pas de \`\`\`, pas de \`\`\`js, pas de \`\`\`json).
+- Conserver le style, les imports, et la logique déjà en place, en appliquant juste l'instruction demandée.
+
+Si l'instruction est ambiguë, choisis l'option la plus raisonnable pour un backend Node/Express moderne.
+            `.trim(),
+        },
+        {
+          role: "user",
+          content: `Chemin du fichier: ${filePath}\n\nInstruction:\n${instruction}\n\n---\n\nContenu actuel du fichier:\n${fileContent}`,
+        },
+      ],
+    });
+
+    const rawContent =
+      completion?.choices?.[0]?.message?.content ?? "";
+
+    const newContent = cleanCode(
+      typeof rawContent === "string"
+        ? rawContent
+        : Array.isArray(rawContent)
+        ? rawContent.map((part) => part?.text ?? "").join("")
+        : ""
+    );
+
+    if (!newContent) {
+      return res.status(500).json({
+        error:
+          "La réponse IA est vide ou invalide. Réessaie avec une instruction plus précise.",
+      });
+    }
+
+    // 🔒 Sécurité : si le nouveau contenu est BEAUCOUP plus court que l'original,
+    // on considère que l'IA a probablement supprimé trop de code.
+    const originalTrimmed = fileContent.trim();
+    const newTrimmed = newContent.trim();
+
+    if (
+      originalTrimmed.length > 0 &&
+      newTrimmed.length < originalTrimmed.length * 0.3
+    ) {
+      return res.status(422).json({
+        error:
+          "La modification IA semble supprimer une grande partie du fichier. Rien n'a été appliquée.",
+        message:
+          "Reformule l'instruction en précisant bien de conserver tout le fichier et d'ajouter seulement ce dont tu as besoin.",
+        originalPreview: originalTrimmed.slice(0, 500),
+        newPreview: newTrimmed.slice(0, 500),
+      });
+    }
+
+    return res.json({
+      path: filePath,
+      content: newTrimmed,
+    });
+  } catch (error) {
+    console.error("Erreur dans /api/generate/refactor-file:", error);
+
+    const rawMessage = error?.message ?? "";
+    const looksLikeHtml =
+      typeof rawMessage === "string" && rawMessage.includes("<!DOCTYPE html>");
+
+    const safeMessage = looksLikeHtml
+      ? "Le service Groq est temporairement indisponible (erreur 500 côté fournisseur). Réessaie dans quelques minutes."
+      : rawMessage;
+
+    return res.status(500).json({
+      error: "Erreur lors de la refactorisation du fichier via Groq",
       message: safeMessage || null,
       status: error?.status ?? null,
       type: error?.name ?? null,
