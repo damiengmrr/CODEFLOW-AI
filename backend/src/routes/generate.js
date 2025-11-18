@@ -29,87 +29,457 @@ function cleanJSON(raw) {
     .trim();
 }
 
-// Helper pour générer des fichiers de code à partir du plan renvoyé par l'IA
-function generateFilesFromPlan(plan) {
+function toPascalCase(str = "") {
+  return String(str)
+    .replace(/[_\-]+/g, " ")
+    .replace(/[^a-zA-Z0-9 ]/g, " ")
+    .split(" ")
+    .filter(Boolean)
+    .map((word) => word[0].toUpperCase() + word.slice(1).toLowerCase())
+    .join("");
+}
+
+function toCamelCase(str = "") {
+  const pascal = toPascalCase(str);
+  return pascal ? pascal[0].toLowerCase() + pascal.slice(1) : "";
+}
+
+function toKebabCase(str = "") {
+  return String(str)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)+/g, "");
+}
+
+function toTableName(str = "") {
+  const base = String(str).trim().toLowerCase().replace(/[^a-z0-9]+/g, "_");
+  return base.endsWith("s") ? base : `${base}s`;
+}
+
+// Helper pour générer un backend Node/Express assez complet à partir du plan
+function generateFilesFromPlan(plan = {}) {
   const files = [];
 
-  // 1) Fichier serveur de base
+  const projectNameRaw =
+    plan.projectName || plan.name || plan.stack || "codeflow-backend";
+  const slug =
+    toKebabCase(projectNameRaw) || "codeflow-backend";
+
+  const entities = Array.isArray(plan.entities) ? plan.entities : [];
+  const routes = Array.isArray(plan.routes) ? plan.routes : [];
+
+  // --- package.json ------------------------------------------------------
+  const packageJsonContent = `{
+  "name": "${slug}",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node src/server.js",
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.0",
+    "express": "^4.19.0",
+    "jsonwebtoken": "^9.0.0",
+    "morgan": "^1.10.0",
+    "pg": "^8.13.0"
+  }
+}
+`;
   files.push({
-    path: "src/server.js",
-    content: `import express from "express";
-import cors from "cors";
-
-const app = express();
-app.use(cors());
-app.use(express.json());
-
-app.get("/", (req, res) => {
-  res.json({ message: "API générée par CODEFLOW-AI 🚀" });
-});
-
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log("Server running on port " + PORT);
-});
-`,
+    path: "package.json",
+    content: packageJsonContent,
   });
 
-  // 2) Exemple de routes todos si le plan contient une route "Todos"
-  const hasTodoRoute = Array.isArray(plan.routes)
-    ? plan.routes.some(
-        (r) => r.name && String(r.name).toLowerCase() === "todos"
-      )
-    : false;
+  // --- .env.example ------------------------------------------------------
+  const envExample = `# Exemple de configuration pour un backend généré par CODEFLOW-AI
 
-  if (hasTodoRoute) {
-    files.push({
-      path: "src/routes/todos.js",
-      content: `import { Router } from "express";
+PORT=5000
 
-const router = Router();
+# Clé API Groq (optionnelle, côté génération)
+GROQ_API_KEY=sk-...
 
-// GET /todos
-router.get("/", (req, res) => {
-  res.json([{ id: 1, title: "Todo générée", done: false }]);
+# Base PostgreSQL (adapter le user/mot de passe/port/nom de base)
+DATABASE_URL=postgres://user:password@localhost:5432/app
+
+# Secret JWT pour l'auth
+JWT_SECRET=change-me-in-production
+`;
+  files.push({
+    path: ".env.example",
+    content: envExample,
+  });
+
+  // --- src/config/database.js -------------------------------------------
+  const dbConfig = `import dotenv from "dotenv";
+import pkg from "pg";
+
+const { Pool } = pkg;
+
+dotenv.config();
+
+const connectionString =
+  process.env.DATABASE_URL ||
+  "postgres://user:password@localhost:5432/app";
+
+export const pool = new Pool({
+  connectionString,
 });
 
-// POST /todos
-router.post("/", (req, res) => {
-  const todo = req.body;
-  // ici tu ferais un insert en base
-  res.status(201).json({ ...todo, id: 2 });
+export async function query(text, params) {
+  return pool.query(text, params);
+}
+`;
+  files.push({
+    path: "src/config/database.js",
+    content: dbConfig,
+  });
+
+  // --- src/config/auth.js -----------------------------------------------
+  const authConfig = `import dotenv from "dotenv";
+import jwt from "jsonwebtoken";
+
+dotenv.config();
+
+export const JWT_SECRET = process.env.JWT_SECRET || "change-me-in-production";
+
+export function signToken(payload, options = {}) {
+  return jwt.sign(payload, JWT_SECRET, {
+    expiresIn: "7d",
+    ...options,
+  });
+}
+
+export function verifyToken(token) {
+  return jwt.verify(token, JWT_SECRET);
+}
+`;
+  files.push({
+    path: "src/config/auth.js",
+    content: authConfig,
+  });
+
+  // --- middlewares d'erreur / 404 ---------------------------------------
+  const notFoundMiddleware = `export default function notFound(req, res, next) {
+  res.status(404).json({
+    error: "Route non trouvée",
+    path: req.originalUrl,
+  });
+}
+`;
+  files.push({
+    path: "src/middlewares/notFound.js",
+    content: notFoundMiddleware,
+  });
+
+  const errorHandlerMiddleware = `export default function errorHandler(err, req, res, next) {
+  console.error("Erreur interne:", err);
+
+  const status = err.status || 500;
+  const message = err.message || "Erreur interne du serveur";
+
+  res.status(status).json({
+    error: message,
+  });
+}
+`;
+  files.push({
+    path: "src/middlewares/errorHandler.js",
+    content: errorHandlerMiddleware,
+  });
+
+  // --- src/server.js (serveur Express complet) --------------------------
+  const serverJs = `import express from "express";
+import cors from "cors";
+import morgan from "morgan";
+import dotenv from "dotenv";
+
+import registerRoutes from "./routes/index.js";
+import notFound from "./middlewares/notFound.js";
+import errorHandler from "./middlewares/errorHandler.js";
+
+dotenv.config();
+
+const app = express();
+
+app.use(cors());
+app.use(express.json());
+app.use(morgan("dev"));
+
+app.get("/", (req, res) => {
+  res.json({
+    message: "Backend généré par CODEFLOW-AI 🚀",
+    stack: "${String(plan.stack || "").replace(/"/g, '\\"')}",
+    description: "${String(plan.description || "").replace(/"/g, '\\"')}",
+  });
 });
 
-export default router;
-`,
-    });
+// Enregistrement dynamique des routes
+registerRoutes(app);
+
+// Middlewares de fin de chaîne
+app.use(notFound);
+app.use(errorHandler);
+
+const PORT = process.env.PORT || 5000;
+
+app.listen(PORT, () => {
+  console.log("✅ Serveur démarré sur http://localhost:" + PORT);
+});
+`;
+  files.push({
+    path: "src/server.js",
+    content: serverJs,
+  });
+
+  // --- src/routes/index.js (enregistre toutes les routes déclarées) -----
+  const routeGroups = routes.filter((r) => r && r.name);
+  let routesIndexImports = "";
+  let routesIndexBody = "";
+
+  routeGroups.forEach((group) => {
+    const groupName = group.name;
+    const camelName = toCamelCase(groupName);
+    const fileSlug = toKebabCase(groupName) || camelName || "routes";
+    const basePath = group.basePath || `/${fileSlug}`;
+    const importName = `${camelName}Router` || "router";
+
+    routesIndexImports += `import ${importName} from "./${fileSlug}.js";\n`;
+    routesIndexBody += `  app.use("${basePath}", ${importName});\n`;
+  });
+
+  if (!routesIndexBody) {
+    routesIndexBody = '  // Aucune route déclarée pour le moment.\n';
   }
 
-  // 3) Exemple de modèles si des entités sont présentes
-  if (Array.isArray(plan.entities)) {
-    plan.entities.forEach((entity) => {
-      if (!entity?.name || !Array.isArray(entity.fields)) return;
+  const routesIndex = `${routesIndexImports}
+export default function registerRoutes(app) {
+${routesIndexBody}}
+`;
+  files.push({
+    path: "src/routes/index.js",
+    content: routesIndex,
+  });
 
-      const className = entity.name;
-      const filePath = `src/models/${className}.js`;
+  // --- Génération des routes + controllers ------------------------------
+  routeGroups.forEach((group) => {
+    const groupName = group.name;
+    const pascalName = toPascalCase(groupName);
+    const camelName = toCamelCase(groupName);
+    const fileSlug = toKebabCase(groupName) || camelName || "routes";
+    const controllerName = `${pascalName}Controller`;
+    const controllerFile = `src/controllers/${controllerName}.js`;
+    const routeFile = `src/routes/${fileSlug}.js`;
 
-      const fieldsInit = entity.fields
-        .map((f) => `    this.${f.name} = data.${f.name} ?? null;`)
-        .join("\n");
+    const endpoints = Array.isArray(group.endpoints)
+      ? group.endpoints
+      : [];
 
-      const modelContent = `export default class ${className} {
+    // Route file
+    let routeContent = `import { Router } from "express";
+import * as ${controllerName} from "../controllers/${controllerName}.js";
+
+const router = Router();
+`;
+
+    endpoints.forEach((ep) => {
+      if (!ep || !ep.method || !ep.path) return;
+      const method = String(ep.method || "get").toLowerCase();
+      const handler =
+        ep.handler && /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(ep.handler)
+          ? ep.handler
+          : `${method}${toPascalCase(ep.path || "Handler")}Handler`;
+
+      routeContent += `
+router.${method}("${ep.path}", ${controllerName}.${handler});
+`;
+    });
+
+    routeContent += `
+
+export default router;
+`;
+
+    files.push({
+      path: routeFile,
+      content: routeContent,
+    });
+
+    // Controller file
+    let controllerContent = `// Contrôleur généré pour le groupe de routes "${groupName}"
+// Chaque handler délègue la logique métier à un service dédié (à créer dans src/services).
+
+`;
+
+    endpoints.forEach((ep) => {
+      if (!ep || !ep.method || !ep.path) return;
+      const method = String(ep.method || "get").toLowerCase();
+      const handler =
+        ep.handler && /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(ep.handler)
+          ? ep.handler
+          : `${method}${toPascalCase(ep.path || "Handler")}Handler`;
+
+      controllerContent += `export async function ${handler}(req, res, next) {
+  try {
+    // TODO: appeler la couche service correspondante et renvoyer la réponse
+    // Exemple:
+    // const data = await myService.doSomething(req);
+    // return res.json(data);
+
+    return res.status(501).json({
+      message: "Handler '${handler}' non implémenté pour le moment.",
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+`;
+    });
+
+    if (!endpoints.length) {
+      controllerContent += `// Aucune route déclarée pour ce groupe pour le moment.\n`;
+    }
+
+    files.push({
+      path: controllerFile,
+      content: controllerContent,
+    });
+  });
+
+  // --- Génération des modèles & services à partir des entités ----------
+  entities.forEach((entity) => {
+    if (!entity || !entity.name || !Array.isArray(entity.fields)) return;
+
+    const className = toPascalCase(entity.name);
+    const modelPath = `src/models/${className}.js`;
+    const servicePath = `src/services/${toCamelCase(entity.name)}Service.js`;
+    const tableName = toTableName(entity.name);
+
+    const fieldsInit = entity.fields
+      .map((f) => `    this.${f.name} = data.${f.name} ?? null;`)
+      .join("\n");
+
+    const modelContent = `// Modèle simple pour l'entité "${entity.name}"
+export default class ${className} {
   constructor(data = {}) {
 ${fieldsInit}
   }
 }
 `;
-
-      files.push({
-        path: filePath,
-        content: modelContent,
-      });
+    files.push({
+      path: modelPath,
+      content: modelContent,
     });
-  }
+
+    const nonPrimaryFields = entity.fields.filter(
+      (f) => !f.primary && f.name
+    );
+    const primaryField =
+      entity.fields.find((f) => f.primary) || entity.fields[0];
+
+    const columns = nonPrimaryFields.map((f) => f.name);
+    const insertColumns = columns.join(", ");
+    const insertParams = columns
+      .map((_, index) => `$${index + 1}`)
+      .join(", ");
+
+    const serviceContent = `// Service PostgreSQL pour l'entité "${entity.name}"
+import { query } from "../config/database.js";
+
+const TABLE = "${tableName}";
+
+export async function findAll() {
+  const { rows } = await query(\`SELECT * FROM "\${TABLE}"\`);
+  return rows;
+}
+
+export async function findById(id) {
+  const { rows } = await query(
+    \`SELECT * FROM "\${TABLE}" WHERE "${primaryField?.name || "id"}" = $1\`,
+    [id]
+  );
+  return rows[0] || null;
+}
+
+export async function create(data) {
+  // ⚠️ Pense à adapter les colonnes à ta vraie structure de table.
+  const sql = \`INSERT INTO "\${TABLE}" (${insertColumns})
+               VALUES (${insertParams})
+               RETURNING *\`;
+
+  const params = [${columns.map((c) => `data.${c}`).join(", ")}];
+
+  const { rows } = await query(sql, params);
+  return rows[0];
+}
+
+export async function update(id, data) {
+  // TODO: implémenter une mise à jour dynamique selon les champs modifiés
+  // Pour l'instant, on renvoie une erreur volontairement.
+  throw new Error("update() n'est pas encore implémenté dans ce service.");
+}
+
+export async function remove(id) {
+  await query(
+    \`DELETE FROM "\${TABLE}" WHERE "${primaryField?.name || "id"}" = $1\`,
+    [id]
+  );
+  return true;
+}
+`;
+    files.push({
+      path: servicePath,
+      content: serviceContent,
+    });
+  });
+
+  // --- README minimal dans le projet généré -----------------------------
+  const readmeContent = `# Backend généré avec CODEFLOW-AI
+
+Ce dossier contient un backend Node.js / Express généré automatiquement à partir d'une simple description.
+
+## Démarrage rapide
+
+1. Installe les dépendances :
+
+   \`\`\`bash
+   npm install
+   \`\`\`
+
+2. Copie le fichier \`.env.example\` vers \`.env\` et adapte les valeurs :
+
+   \`\`\`bash
+   cp .env.example .env
+   \`\`\`
+
+3. Lance le serveur :
+
+   \`\`\`bash
+   npm run dev
+   \`\`\`
+
+Le serveur démarre par défaut sur \`http://localhost:5000\`.
+
+## Ce qui est généré
+
+- Un serveur Express prêt à l'emploi (\`src/server.js\`)
+- Une configuration PostgreSQL (\`src/config/database.js\`)
+- Une configuration JWT (\`src/config/auth.js\`)
+- Un système de routes modulaire (\`src/routes/*.js\` + \`src/routes/index.js\`)
+- Des contrôleurs pour chaque groupe de routes (\`src/controllers/*.js\`)
+- Des modèles et services pour chaque entité déclarée dans le plan (\`src/models/*.js\`, \`src/services/*.js\`)
+- Des middlewares d'erreur et de 404 (\`src/middlewares/*.js\`)
+
+Tu peux ensuite brancher ce backend à ton propre projet, adapter les modèles/services, et enrichir les contrôleurs avec ta logique métier.
+`;
+  files.push({
+    path: "README.md",
+    content: readmeContent,
+  });
 
   return files;
 }
@@ -221,9 +591,21 @@ Réponds uniquement avec le JSON brut.
   } catch (error) {
     console.error("Erreur dans /api/generate:", error);
 
+    // Si Groq / Cloudflare renvoie une page HTML (erreur 5xx),
+    // on évite de renvoyer tout le HTML au frontend.
+    const rawMessage = error?.message ?? "";
+    const looksLikeHtml =
+      typeof rawMessage === "string" &&
+      rawMessage.includes("<!DOCTYPE html>");
+
+    const safeMessage = looksLikeHtml
+      ? "Le service Groq est temporairement indisponible (erreur 500 côté fournisseur). Réessaie dans quelques minutes."
+      : rawMessage;
+
     return res.status(500).json({
       error: "Erreur lors de l'appel à Groq",
-      message: error?.message ?? null,
+      message: safeMessage || null,
+      status: error?.status ?? null,
       type: error?.name ?? null,
     });
   }
