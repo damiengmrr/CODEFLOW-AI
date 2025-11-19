@@ -1,56 +1,90 @@
 # 📜 CodeFlow AI — CHANGELOG
 Suivi des évolutions majeures du projet.  
-Format utilisé : *Keep a Changelog* amélioré.
+Format utilisé : *Keep a Changelog* enrichi et adapté au workflow IA.
+
+---
+
+## [0.2.0] — Backend Génération V2 (Ultra‑Solide)
+**Date :** 19 novembre 2025
+
+### 🚀 Améliorations majeures
+- Génération backend totalement réécrite :
+  - architecture **Express modulaire** (routes / controllers / services / models / utils)
+  - génération automatique de fichiers complets (CRUD, validations, erreurs)
+  - modèles enrichis : champs par défaut, typage JS, commentaires dev-friendly
+  - services auto‑documentés avec logique prête à étendre
+  - contrôleurs structurés, blocs try/catch et réponses normalisées
+  - routes REST complètes (GET / POST / PUT / DELETE)
+- Ajout d’un générateur de README automatique basé sur le projet généré
+- Ajout du système **refactor-file** :
+  - l’IA modifie un seul fichier sans effacer le reste
+  - merge intelligent du nouveau code avec l’existant
+  - identité du fichier analysée et préservée
+- Meilleure protection contre la suppression accidentelle de code
+
+### 🔧 Stabilisation & Robustesse
+- Parsing Groq totalement sécurisé
+- Nettoyage de la logique JSON + fallback Markdown → JSON
+- Séparation claire des responsabilités dans `codegenService.js`
+- Normalisation des réponses API
+
+---
+
+## [0.1.2] — Nouvelle UI façon VSCode
+### 🎨 Interface
+- Sidebar avec structure de fichiers + icônes (JS, JSON, dossier…)
+- Intégration de **Monaco Editor** avec thème Dark+
+- Ouverture/fermeture dynamique des fichiers générés
+- Ligne d’état affichant :  
+  _“Tu modifies : src/routes/users.js”_ lorsque l'éditeur IA est actif
+
+### ⚡ Interaction IA améliorée
+- Ajout du mode :  
+  **« continue la conversation avec le projet »**
+- Deux champs séparés :
+  - description backend
+  - instruction d’édition du fichier ciblé
+
+---
+
+## [0.1.1] — Améliorations IA & UI initiales
+### 🎯 Moteur IA
+- Reconstruction du plan backend plus propre
+- Ajout de la validation JSON multi-niveaux
+- Gestion avancée des entités
+
+### 🎨 UI
+- Integration images / visuels dans l’interface
+- Palette accordée au logo
 
 ---
 
 ## [0.1.0] — Bêta publique initiale
-**Date :** 17 novembre 2025
+**Date :** 17 novembre 2025  
+Version fondatrice du projet CodeFlow AI.
 
-### 🎉 Nouveautés
-- Création du monorepo `CODEFLOW-AI` (backend + frontend)
-- Intégration complète du moteur IA basé sur Groq
-- Ajout de la route `/api/generate` pour générer des architectures backend
-- Génération de dossiers structurés dans `backend/generated/<project>/`
-- Interface frontend permettant :
-  - la saisie d’un prompt
-  - l’affichage des entités générées
-  - la visualisation et copie des fichiers générés
-- Mise en place d’un design simple avec zones dédiées aux images et illustrations
-
-### 🛠 Infrastructure
-- Backend Express configuré et stable
-- Frontend React + Vite opérationnel
-- `.env` avec variables propres (GROQ_API_KEY…)
+### Fonctionnalités initiales
+- Génération backend simple (routes + fichiers basiques)
+- Interface React/Vite
+- Copie des fichiers générés
+- Moteur Groq branché pour les prompts backend
+- Monorepo backend + frontend
 
 ---
 
-## [0.1.1] — Améliorations UI & Génération
-**En cours**
-
-### 🔥 Améliorations prévues
-- Refonte de l’interface pour une expérience plus moderne
-- Intégration d’un thème graphique basé sur la palette du logo
-- Ajout des images explicatives dans les zones dédiées
-- Mise en place d’un affichage plus dynamique des fichiers générés
-
-### 🧠 Moteur IA
-- Amélioration du parsing JSON pour une génération plus fiable
-- Meilleur support des prompts full-stack
-
----
-
-## 🔮 À venir (Roadmap)
-- Génération complète de frontend (React, Next.js…)
-- Génération d’un ZIP téléchargeable automatiquement
-- Interface façon IDE (explorateur + éditeur intégré)
-- Système de presets (API, SaaS, e-commerce…)
-- Génération Dockerfile + docker-compose
-- Export direct vers GitHub
-- Collaboration temps réel
+## 🔮 Roadmap
+- Génération frontend (React / Next.js / Tailwind)
+- Génération full-stack synchronisée backend ↔ frontend
+- Export ZIP complet
+- Déploiement automatique (Docker + Render + GitHub Actions)
+- Mode collaboratif en temps réel
+- Marketplace de presets prêts à l’emploi
 
 ---
 
 ## 📌 Notes
-Ce changelog évoluera à chaque mise à jour du projet.  
-CodeFlow AI étant en **développement constant**, des modifications fréquentes sont prévues.
+CodeFlow AI évolue très vite.  
+Chaque mise à jour intègre :
+- plus de puissance IA,
+- plus de fiabilité dans le code généré,
+- plus de logique prête pour un vrai projet pro.
