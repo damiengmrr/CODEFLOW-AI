@@ -44,6 +44,8 @@ function App() {
   const [rawCopyMessage, setRawCopyMessage] = useState("");
   const [zipLoading, setZipLoading] = useState(false);
   const [zipMessage, setZipMessage] = useState("");
+  const [aiEditing, setAiEditing] = useState(false);
+  const [aiEditMessage, setAiEditMessage] = useState("");
 
   const hasResult = !!result;
   const plan = result?.plan;
@@ -271,6 +273,86 @@ function App() {
     return found;
   };
 
+  const handleAiEdit = async () => {
+    if (!result || !files.length) {
+      setError(
+        "Aucun backend généré pour le moment. Commence par générer un projet."
+      );
+      return;
+    }
+
+    const targetFile = currentFile;
+    if (!targetFile) {
+      setError("Sélectionne d'abord un fichier à modifier.");
+      return;
+    }
+
+    setAiEditing(true);
+    setAiEditMessage("");
+    setError("");
+
+    try {
+      const body = {
+        prompt,
+        mode: "edit-file",
+        targetFilePath: targetFile.path,
+        files: files.map((f) => ({
+          path: f.path,
+          content: editedFiles[f.path] ?? f.content,
+        })),
+      };
+
+      const response = await fetch("http://localhost:4000/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Erreur lors de la modification IA");
+      }
+
+      if (Array.isArray(data.files) && data.files.length > 0) {
+        setResult((prev) => ({
+          ...prev,
+          plan: data.plan || prev?.plan || null,
+          files: data.files,
+        }));
+      } else if (data.updatedFile && data.updatedFile.path) {
+        const updatedFiles = files.map((f) =>
+          f.path === data.updatedFile.path
+            ? { ...f, content: data.updatedFile.content }
+            : f
+        );
+        setResult((prev) => ({
+          ...prev,
+          plan: data.plan || prev?.plan || null,
+          files: updatedFiles,
+        }));
+      } else {
+        setAiEditMessage(
+          "Modification effectuée, mais aucun fichier mis à jour n'a été renvoyé."
+        );
+        setTimeout(() => setAiEditMessage(""), 3000);
+        return;
+      }
+
+      setEditedFiles({});
+      setSelectedFilePath(targetFile.path);
+      setAiEditMessage("Fichier mis à jour par l'IA ✅");
+      setTimeout(() => setAiEditMessage(""), 2500);
+    } catch (err) {
+      console.error(err);
+      setError(
+        err?.message || "Erreur inconnue lors de la modification avec l'IA"
+      );
+    } finally {
+      setAiEditing(false);
+    }
+  };
+
   const currentFile = getCurrentFile();
   const currentContent = currentFile
     ? editedFiles[currentFile.path] ?? currentFile.content
@@ -387,7 +469,7 @@ function App() {
         >
           <button
             onClick={handleGenerate}
-            disabled={loading}
+            disabled={loading || aiEditing}
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",
@@ -396,7 +478,7 @@ function App() {
                 ? "rgba(0,122,204,0.4)"
                 : "linear-gradient(135deg,#22c55e,#0ea5e9)",
               color: "#ecfeff",
-              cursor: loading ? "default" : "pointer",
+              cursor: loading || aiEditing ? "default" : "pointer",
               fontWeight: 600,
               fontSize: "0.9rem",
               boxShadow:
@@ -405,10 +487,33 @@ function App() {
           >
             {loading ? "Génération..." : "Générer 🔥"}
           </button>
+
+          {hasResult && currentFile && (
+            <button
+              type="button"
+              onClick={handleAiEdit}
+              disabled={aiEditing || loading}
+              style={{
+                padding: "0.6rem 1.1rem",
+                borderRadius: "999px",
+                border: `1px solid ${theme.accent}`,
+                background: aiEditing
+                  ? "rgba(0,122,204,0.4)"
+                  : "rgba(15,23,42,0.95)",
+                color: aiEditing ? "#9ca3af" : "#e5e7eb",
+                cursor: aiEditing || loading ? "default" : "pointer",
+                fontWeight: 500,
+                fontSize: "0.85rem",
+              }}
+            >
+              {aiEditing ? "Modification..." : "Modifier ce fichier avec l'IA"}
+            </button>
+          )}
+
           <button
             type="button"
             onClick={handleDownloadZip}
-            disabled={zipLoading || loading}
+            disabled={zipLoading || loading || aiEditing}
             style={{
               padding: "0.6rem 1.1rem",
               borderRadius: "999px",
@@ -417,7 +522,7 @@ function App() {
                 ? "rgba(15,23,42,0.8)"
                 : "rgba(15,23,42,0.95)",
               color: zipLoading ? "#9ca3af" : "#e5e7eb",
-              cursor: zipLoading || loading ? "default" : "pointer",
+              cursor: zipLoading || loading || aiEditing ? "default" : "pointer",
               fontWeight: 500,
               fontSize: "0.85rem",
             }}
@@ -453,6 +558,20 @@ function App() {
           }}
         >
           {zipMessage}
+        </p>
+      )}
+      {aiEditMessage && (
+        <p
+          style={{
+            marginTop: "0.25rem",
+            color: "#a5b4fc",
+            fontSize: "0.8rem",
+            padding: "0.4rem 0.7rem",
+            background: "rgba(30,64,175,0.35)",
+            borderRadius: "999px",
+          }}
+        >
+          {aiEditMessage}
         </p>
       )}
     </div>

@@ -506,6 +506,58 @@ ${fieldsInit}
       .map((_, index) => `$${index + 1}`)
       .join(", ");
 
+    // Corps de la fonction create() généré en fonction des colonnes disponibles
+    let createBody;
+    if (columns.length === 0) {
+      // Aucun champ non primaire : on s'appuie sur DEFAULT VALUES (id auto-généré, timestamps, etc.)
+      createBody = `
+  const sql = \`INSERT INTO "\${TABLE}" DEFAULT VALUES RETURNING *\`;
+
+  const { rows } = await query(sql);
+  return rows[0];
+`;
+    } else {
+      createBody = `
+  // ⚠️ Pense à adapter les colonnes à ta vraie structure de table si nécessaire.
+  const sql = \`INSERT INTO "\${TABLE}" (${insertColumns})
+               VALUES (${insertParams})
+               RETURNING *\`;
+
+  const params = [${columns.map((c) => `data.${c}`).join(", ")}];
+
+  const { rows } = await query(sql, params);
+  return rows[0];
+`;
+    }
+
+    // Corps de la fonction update() généré avec une mise à jour dynamique
+    const allowedColumnsCode = JSON.stringify(columns);
+
+    const updateBody = `
+  const allowed = ${allowedColumnsCode};
+  const setClauses = [];
+  const params = [];
+  let index = 1;
+
+  for (const [key, value] of Object.entries(data)) {
+    if (!allowed.includes(key)) continue;
+    setClauses.push(\`"\${key}" = $\${index}\`);
+    params.push(value);
+    index++;
+  }
+
+  if (!setClauses.length) {
+    throw new Error("Aucun champ valide fourni pour la mise à jour.");
+  }
+
+  params.push(id);
+
+  const sql = \`UPDATE "\${TABLE}" SET \${setClauses.join(", ")} WHERE "${primaryField?.name || "id"}" = $\${index} RETURNING *\`;
+
+  const { rows } = await query(sql, params);
+  return rows[0] || null;
+`;
+
     const serviceContent = `// Service PostgreSQL pour l'entité "${entity.name}"
 import { query } from "../config/database.js";
 
@@ -524,22 +576,10 @@ export async function findById(id) {
   return rows[0] || null;
 }
 
-export async function create(data) {
-  // ⚠️ Pense à adapter les colonnes à ta vraie structure de table.
-  const sql = \`INSERT INTO "\${TABLE}" (${insertColumns})
-               VALUES (${insertParams})
-               RETURNING *\`;
-
-  const params = [${columns.map((c) => `data.${c}`).join(", ")}];
-
-  const { rows } = await query(sql, params);
-  return rows[0];
+export async function create(data) {${createBody}
 }
 
-export async function update(id, data) {
-  // TODO: implémenter une mise à jour dynamique selon les champs modifiés
-  // Pour l'instant, on renvoie une erreur volontairement.
-  throw new Error("update() n'est pas encore implémenté dans ce service.");
+export async function update(id, data) {${updateBody}
 }
 
 export async function remove(id) {

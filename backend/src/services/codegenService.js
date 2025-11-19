@@ -189,20 +189,74 @@ function buildModelFile(entity) {
     })
     .join('\n');
 
+  const assignments =
+    fields.length > 0
+      ? fields
+          .map((f) => {
+            const fieldName = f.name || 'field';
+            return `    this.${fieldName} = data.${fieldName} ?? null;`;
+          })
+          .join('\n')
+      : '    // Ajoute ici les champs nécessaires';
+
+  const fromRowBody =
+    fields.length > 0
+      ? fields
+          .map((f) => {
+            const fieldName = f.name || 'field';
+            return `        ${fieldName}: row.${fieldName},`;
+          })
+          .join('\n')
+      : '        // mappe ici les colonnes de ta table vers les propriétés du modèle';
+
+  const toRowBody =
+    fields.length > 0
+      ? fields
+          .map((f) => {
+            const fieldName = f.name || 'field';
+            return `      ${fieldName}: this.${fieldName},`;
+          })
+          .join('\n')
+      : '      // mappe ici les propriétés du modèle vers les colonnes de ta table';
+
   return `
-/**
+/****
  * Modèle généré pour ${name}
 ${fieldsComment ? '\n' + fieldsComment : ''}
+ *
+ * Fournit :
+ *   - constructeur à partir d'un objet data
+ *   - ${name}.fromRow(row) : mapping SQL -> modèle
+ *   - .toRow() : mapping modèle -> SQL row
  */
 class ${name} {
+  /**
+   * @param {Object} data
+${fieldsComment ? fieldsComment.replace(/^/gm, '   ') : ''}
+   */
   constructor(data = {}) {
-${fields
-  .map((f) => {
-    const fieldName = f.name || 'field';
-    return `    this.${fieldName} = data.${fieldName} ?? null;`;
-  })
-  .join('\n') || '    // Ajoute ici les champs nécessaires'
-}
+${assignments}
+  }
+
+  /**
+   * Construit une instance de ${name} à partir d'une ligne de base de données.
+   * @param {Object} row
+   * @returns {${name}}
+   */
+  static fromRow(row = {}) {
+    return new ${name}({
+${fromRowBody}
+    });
+  }
+
+  /**
+   * Sérialise ce modèle vers un objet "row" prêt à être utilisé dans une requête SQL.
+   * @returns {Object}
+   */
+  toRow() {
+    return {
+${toRowBody}
+    };
   }
 }
 
@@ -217,51 +271,151 @@ function buildServiceFile(route, entity) {
   const routeName = route.name || route.basePath || 'resource';
   const serviceName = toPascalCase(routeName) + 'Service';
   const entityName = entity ? toPascalCase(entity.name) : null;
+  const tableName = toKebabCase(routeName);
+
   const entityImport = entityName
     ? `const ${entityName} = require('../models/${entityName}');\n`
     : '';
+
+  const entityFields = Array.isArray(entity?.fields) ? entity.fields : [];
+  const hasIdField = entityFields.some((f) => f.name === 'id');
+  const nonIdFields = entityFields.filter((f) => f.name && f.name !== 'id');
+
+  const insertColumns = nonIdFields.map((f) => f.name);
+  const updateColumns = nonIdFields.map((f) => f.name);
+
+  const hasInsertColumns = insertColumns.length > 0;
+  const hasUpdateColumns = updateColumns.length > 0;
+
+  const orderByColumn = hasIdField ? 'id' : '1';
+
+  const insertSql = hasInsertColumns
+    ? `'INSERT INTO ${tableName} (${insertColumns.join(', ')}) VALUES (${insertColumns
+        .map((_, i) => '$' + (i + 1))
+        .join(', ')}) RETURNING *'`
+    : `'INSERT INTO ${tableName} (col1, col2) VALUES ($1, $2) RETURNING *'`;
+
+  const insertValues = hasInsertColumns
+    ? `[${insertColumns.map((c) => `payload.${c}`).join(', ')}]`
+    : `[payload.col1, payload.col2]`;
+
+  const updateSql = hasUpdateColumns
+    ? `'UPDATE ${tableName} SET ${updateColumns
+        .map((c, i) => `${c} = $${i + 1}`)
+        .join(', ')} WHERE id = $${updateColumns.length + 1} RETURNING *'`
+    : `'UPDATE ${tableName} SET col1 = $1, col2 = $2 WHERE id = $3 RETURNING *'`;
+
+  const updateValues = hasUpdateColumns
+    ? `[${updateColumns.map((c) => `payload.${c}`).join(', ')}, id]`
+    : `[payload.col1, payload.col2, id]`;
+
+  const deleteSql = hasIdField
+    ? `'DELETE FROM ${tableName} WHERE id = $1 RETURNING *'`
+    : `'DELETE FROM ${tableName} WHERE /* adapte la colonne de clé primaire */ id = $1 RETURNING *'`;
 
   return `
 const { getPool } = require('../config/database');
 ${entityImport}/**
  * Service généré pour ${routeName}
- * Tu peux adapter les requêtes SQL à ton vrai schéma.
+ *
+ * Cette classe encapsule la logique métier et l'accès à la base PostgreSQL.
+ * Tu peux l'utiliser telle quelle comme base, puis adapter au besoin.
  */
 class ${serviceName} {
   constructor() {
     this.pool = getPool();
   }
 
-  async findAll() {
-    // Exemple générique : à adapter
-    const result = await this.pool.query('SELECT * FROM ${toKebabCase(
-      routeName
-    )}');
-    return result.rows;
+  /**
+   * Récupérer toutes les lignes de ${tableName}, avec pagination simple.
+   * @param {Object} options
+   * @param {number} [options.limit=50]
+   * @param {number} [options.offset=0]
+   */
+  async findAll(options = {}) {
+    const { limit = 50, offset = 0 } = options;
+
+    const result = await this.pool.query(
+      'SELECT * FROM ${tableName} ORDER BY ${orderByColumn} LIMIT $1 OFFSET $2',
+      [limit, offset]
+    );
+${
+  entityName
+    ? `    return result.rows.map((row) => ${entityName}.fromRow(row));`
+    : '    return result.rows;'
+}
   }
 
+  /**
+   * Récupérer une ligne par ID.
+   * @param {string|number} id
+   */
   async findById(id) {
     const result = await this.pool.query(
-      'SELECT * FROM ${toKebabCase(routeName)} WHERE id = $1',
+      'SELECT * FROM ${tableName} WHERE id = $1',
       [id]
     );
-    return result.rows[0] || null;
+    const row = result.rows[0] || null;
+${
+  entityName
+    ? `    return row ? ${entityName}.fromRow(row) : null;`
+    : '    return row;'
+}
   }
 
+  /**
+   * Créer une nouvelle ressource.
+   * @param {Object} payload
+   */
   async create(payload) {
-    // TODO: adapte les colonnes / valeurs en fonction de ton modèle
-    // return nouvelEnregistrement;
-    return payload;
+    // 💡 Tu peux ajouter ici une validation (zod / joi / yup, etc.)
+    // avant d'insérer en base.
+
+    const text = ${insertSql};
+    const values = ${insertValues};
+
+    const result = await this.pool.query(text, values);
+${
+  entityName
+    ? `    return ${entityName}.fromRow(result.rows[0]);`
+    : '    return result.rows[0];'
+}
   }
 
+  /**
+   * Mettre à jour une ressource existante.
+   * @param {string|number} id
+   * @param {Object} payload
+   */
   async update(id, payload) {
-    // TODO: adapte la requête UPDATE
-    return { id, ...payload };
+    // 💡 Même idée ici : ajoute une validation et/ou une logique métier
+    // avant de persister les changements.
+
+    const text = ${updateSql};
+    const values = ${updateValues};
+
+    const result = await this.pool.query(text, values);
+${
+  entityName
+    ? `    return result.rows[0] ? ${entityName}.fromRow(result.rows[0]) : null;`
+    : '    return result.rows[0] || null;'
+}
   }
 
+  /**
+   * Supprimer une ressource.
+   * @param {string|number} id
+   */
   async remove(id) {
-    // TODO: adapte la requête DELETE
-    return { id };
+    const text = ${deleteSql};
+    const values = [id];
+
+    const result = await this.pool.query(text, values);
+${
+  entityName
+    ? `    return result.rows[0] ? ${entityName}.fromRow(result.rows[0]) : null;`
+    : '    return result.rows[0] || null;'
+}
   }
 }
 
@@ -279,7 +433,7 @@ function buildControllerFile(route, entity) {
 
   const endpoints = route.endpoints || [];
 
-  // On regarde les handlers explicitement fournis par le plan
+  // Handlers définis dans le plan IA (loginHandler, registerHandler, etc.)
   const handlersFromPlan = new Set(
     endpoints
       .map((e) => e.handler)
@@ -287,28 +441,153 @@ function buildControllerFile(route, entity) {
       .map((h) => String(h).trim())
   );
 
-  // Sinon on propose un CRUD standard
+  // Handlers CRUD par défaut
   const defaultHandlers = [
-    { name: 'getAll', comment: 'Récupérer toutes les ressources' },
-    { name: 'getOne', comment: 'Récupérer une ressource par ID' },
-    { name: 'create', comment: 'Créer une ressource' },
-    { name: 'update', comment: 'Mettre à jour une ressource' },
-    { name: 'remove', comment: 'Supprimer une ressource' },
+    'getAll',
+    'getOne',
+    'create',
+    'update',
+    'remove',
   ];
 
   const handlerNames =
-    handlersFromPlan.size > 0 ? Array.from(handlersFromPlan) : defaultHandlers.map((h) => h.name);
+    handlersFromPlan.size > 0 ? Array.from(handlersFromPlan) : defaultHandlers;
+
+  const knownCrud = new Set(['getAll', 'getOne', 'create', 'update', 'remove']);
 
   const methodsCode = handlerNames
     .map((handler) => {
       const methodName = toCamelCase(handler);
-      return `
+
+      // Handlers CRUD avec logique prête à l'emploi
+      if (knownCrud.has(methodName)) {
+        if (methodName === 'getAll') {
+          return `
+  /**
+   * GET /resource
+   * Récupération paginée des ressources.
+   * Query params : ?limit=50&amp;offset=0
+   */
   async ${methodName}(req, res, next) {
     try {
-      // TODO: implémente la logique métier
-      // Exemple:
-      // const data = await ${serviceName}.${methodName}(/* params */);
-      // return res.json(data);
+      const limitRaw = req.query.limit;
+      const offsetRaw = req.query.offset;
+
+      const limit = limitRaw ? parseInt(limitRaw, 10) : undefined;
+      const offset = offsetRaw ? parseInt(offsetRaw, 10) : undefined;
+
+      const data = await ${serviceName}.findAll({
+        limit: Number.isFinite(limit) ? limit : undefined,
+        offset: Number.isFinite(offset) ? offset : undefined,
+      });
+
+      return res.json(data);
+    } catch (err) {
+      next(err);
+    }
+  }`;
+        }
+
+        if (methodName === 'getOne') {
+          return `
+  /**
+   * GET /resource/:id
+   * Récupération d'une ressource par ID.
+   */
+  async ${methodName}(req, res, next) {
+    try {
+      const { id } = req.params;
+      const data = await ${serviceName}.findById(id);
+
+      if (!data) {
+        return res.status(404).json({ error: 'Ressource introuvable' });
+      }
+
+      return res.json(data);
+    } catch (err) {
+      next(err);
+    }
+  }`;
+        }
+
+        if (methodName === 'create') {
+          return `
+  /**
+   * POST /resource
+   * Création d'une ressource.
+   */
+  async ${methodName}(req, res, next) {
+    try {
+      const payload = req.body;
+
+      // 💡 Ajoute ici une validation (zod / joi / yup / class-validator...)
+      // avant d'appeler le service.
+      const created = await ${serviceName}.create(payload);
+
+      return res.status(201).json(created);
+    } catch (err) {
+      next(err);
+    }
+  }`;
+        }
+
+        if (methodName === 'update') {
+          return `
+  /**
+   * PUT/PATCH /resource/:id
+   * Mise à jour d'une ressource.
+   */
+  async ${methodName}(req, res, next) {
+    try {
+      const { id } = req.params;
+      const payload = req.body;
+
+      // 💡 Même principe : tu peux ajouter une validation ici.
+      const updated = await ${serviceName}.update(id, payload);
+
+      if (!updated) {
+        return res.status(404).json({ error: 'Ressource introuvable' });
+      }
+
+      return res.json(updated);
+    } catch (err) {
+      next(err);
+    }
+  }`;
+        }
+
+        if (methodName === 'remove') {
+          return `
+  /**
+   * DELETE /resource/:id
+   * Suppression d'une ressource.
+   */
+  async ${methodName}(req, res, next) {
+    try {
+      const { id } = req.params;
+      const removed = await ${serviceName}.remove(id);
+
+      if (!removed) {
+        return res.status(404).json({ error: 'Ressource introuvable' });
+      }
+
+      return res.status(204).send();
+    } catch (err) {
+      next(err);
+    }
+  }`;
+        }
+      }
+
+      // Handlers non-CRUD ou custom du plan IA : squelette générique
+      return `
+  /**
+   * Handler généré pour ${methodName}.
+   * Implémente ici la logique métier spécifique.
+   */
+  async ${methodName}(req, res, next) {
+    try {
+      // TODO: implémente la logique métier pour ${methodName}
       return res.json({ message: 'Handler ${methodName} non encore implémenté' });
     } catch (err) {
       next(err);
@@ -466,19 +745,52 @@ function buildBackendReadme(plan) {
 
 ${description}
 
-## Stack
+Ce backend est une base solide pour démarrer rapidement une API Node.js/Express
+connectée à PostgreSQL, avec une structure inspirée des bonnes pratiques
+(services, contrôleurs, routes, configuration, etc.).
+
+## Stack technique
 
 - ${stack}
 - Express.js
 - PostgreSQL (via \`pg\`)
 - JWT pour l'authentification
 - Docker (optionnel) pour la base de données
+- Fichiers de service + contrôleur + modèles générés par ressource
+
+## Structure générée (exemple)
+
+\`\`\`
+src/
+  config/
+    database.js      # Connexion PostgreSQL + init
+    auth.js          # JWT + middleware d'authentification
+  models/
+    *.js             # Modèles avec fromRow()/toRow()
+  services/
+    *.js             # Logique métier + accès DB (CRUD)
+  controllers/
+    *.js             # Contrôleurs Express (handlers)
+  routes/
+    *.js             # Fichiers de routes par ressource
+    index.js         # Agrégation des routes
+  server.js          # Point d'entrée Express
+
+.env.example          # Exemple de configuration
+docker-compose.yml    # Postgres prêt à l'emploi
+BACKEND_README.md     # Ce fichier
+\`\`\`
 
 ## Démarrage
 
 1. Copie les fichiers générés dans un dossier de projet.
-2. Duplique \`.env.example\` en \`.env\` et adapte les valeurs.
-3. (Optionnel) Lance PostgreSQL avec \`docker-compose up -d\`.
+2. Duplique \`.env.example\` en \`.env\` et adapte les valeurs (PORT, DATABASE_URL, JWT_SECRET, etc.).
+3. (Optionnel) Lance PostgreSQL avec Docker :
+
+   \`\`\`bash
+   docker-compose up -d
+   \`\`\`
+
 4. Installe les dépendances nécessaires :
 
    \`\`\`bash
@@ -491,7 +803,14 @@ ${description}
    node src/server.js
    \`\`\`
 
-Tu peux ensuite adapter les services, modèles, contrôleurs et routes en fonction de ton besoin métier.
+## Personnalisation
+
+- Mets à jour les modèles dans \`src/models\` si ton schéma de base de données est différent.
+- Adapte les requêtes SQL dans les services (\`src/services\`) en fonction de ta structure réelle de tables.
+- Ajoute ou modifie des routes et des contrôleurs selon tes besoins métier.
+- Tu peux enrichir ce backend avec des middlewares supplémentaires (validation, logs avancés, rôles, etc.).
+
+CODEFLOW-AI te fournit une base structurée : à toi d'y ajouter ta logique métier ✨
 `.trimStart();
 }
 
