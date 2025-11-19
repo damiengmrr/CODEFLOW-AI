@@ -1,4 +1,3 @@
-```
    _____ ____  _____  ______ ______ _      ______          __           _____ 
   / ____/ __ \|  __ \|  ____|  ____| |    / __ \ \        / /     /\   |_   _|
  | |   | |  | | |  | | |__  | |__  | |   | |  | \ \  /\  / /     /  \    | |  
@@ -6,176 +5,175 @@
  | |___| |__| | |__| | |____| |    | |___| |__| | \  /\  /     / ____ \ _| |_ 
   \_____\____/|_____/|______|_|    |______\____/   \/  \/     /_/    \_\_____|
                                                                               
-```  
-                                                                     
 
-# 🚀 CodeFlow AI — Version Bêta
+# 🚀 CodeFlow AI — Version Bêta Avancée
 
 ![CodeFlow Logo](./frontend/public/images/codeflow-logo.png)
+
 <p align="left">
-  <img src="https://img.shields.io/badge/version-Beta_0.1-blueviolet?style=flat-square" />
-  <img src="https://img.shields.io/badge/Build-Passing-brightgreen?style=flat-square" />
-  <img src="https://img.shields.io/badge/Status-Active_Development-orange?style=flat-square" />
+  <img src="https://img.shields.io/badge/version-Beta_0.2-blueviolet?style=flat-square" />
+  <img src="https://img.shields.io/badge/Backend_Generator-Operational-brightgreen?style=flat-square" />
+  <img src="https://img.shields.io/badge/Refactor_Engine-Active-orange?style=flat-square" />
   <img src="https://img.shields.io/badge/Powered_by-Groq_AI-blue?style=flat-square" />
 </p>
 
-CodeFlow AI est un projet en **version bêta avancée**, conçu pour devenir l’un des générateurs de projets les plus complets et intuitifs du marché.  
-Son but : transformer une simple phrase en une architecture backend ou full‑stack complète, propre, maintenable et prête à être lancée.
-
-Cette bêta représente la base d’une vision beaucoup plus grande : permettre à n’importe quel développeur, étudiant ou entreprise, de générer un projet entier en quelques secondes.
+CodeFlow AI est un générateur de code IA en **version bêta avancée**, conçu pour créer, modifier et améliorer des architectures backend **à partir d’une simple phrase**.  
+Cette version introduit une génération professionnelle des fichiers backend ainsi qu’un moteur d’édition intelligente permettant de modifier n’importe quel fichier sans jamais casser le code existant.
 
 ---
 
-## 🎯 Vision du projet
+# 🎯 Vision de CodeFlow AI
 
-CodeFlow AI a été imaginé comme un **assistant développeur IA**, capable de comprendre une demande formulée en langage naturel et de créer automatiquement :
+CodeFlow AI a été imaginé comme un véritable **assistant développeur IA** :
 
-- une structure de projet cohérente,  
-- des fichiers organisés comme dans un vrai environnement pro,  
-- du code propre et commenté,  
-- des routes, services, modèles et contrôleurs,  
-- et bientôt… un **ZIP complet** ou un **projet frontend + backend entièrement généré**.
+- Comprendre une demande en langage naturel.  
+- Générer une architecture professionnelle et cohérente.  
+- Produire du code propre, organisé et commenté.  
+- Permettre à l'utilisateur de modifier un fichier existant via une simple instruction.  
+- (Bientôt) Générer un ZIP complet du projet.  
+- (Bientôt) Générer aussi le frontend.  
+- (Objectif final) Générer un projet full‑stack entier en une seule phrase.
 
-L’objectif final est simple mais ambitieux :  
-> **Créer une application complète à partir d’une seule phrase.**
+> **Créer une application complète, en quelques secondes, sans quitter CodeFlow.**
 
 ---
 
-## 🧠 Fonctionnement actuel (Bêta)
+# 🧠 Capacités actuelles — État réel de la bêta
 
-Aujourd’hui, CodeFlow AI sait :
+## 🔹 1. Génération automatique d’un backend complet
 
-### 🔹 1. Générer des backends complets  
 À partir d’un prompt comme :  
-> *“Génère une API Node.js avec authentification JWT, CRUD tâches et base PostgreSQL.”*
+> “Crée une API Node.js Express avec authentification JWT, CRUD utilisateurs et base PostgreSQL.”
 
-L’IA répond en produisant :
-- une description précise du backend,
-- les entités nécessaires,
-- les routes complètes,
-- les fichiers à créer,
-- des exemples de code pour chaque fichier.
+L’IA génère :
 
-### 🔹 2. Afficher les fichiers générés dans l’interface  
-Grâce au frontend React, on peut :
-- parcourir les fichiers générés,
-- voir le contenu de chaque fichier dans un éditeur intégré,
-- copier un fichier en un clic,
-- conserver l’historique des prompts,
-- regénérer ou comparer plusieurs résultats.
-
-![Preview Backend](./frontend/public/images/backend-architecture-1.png)
-![Preview Generator](./frontend/public/images/backend-architecture-2.png)
-
-### 🔹 3. Générer dans le backend un dossier structuré  
-Le backend peut écrire les fichiers générés dans  
-`backend/generated/<nom-du-projet>/…`  
-pour faciliter l’export ou le packaging futur.
-
----
-
-## 🚧 Fonctionnalités futures (Roadmap)
-
-Cette bêta n’est qu’une fondation. La suite va amener des fonctionnalités beaucoup plus puissantes :
-
-### 🔥 Prochaines étapes (développement actif)
-- Génération **d’un frontend complet** (React, Next.js, Tailwind)
-- Génération **d’un ZIP téléchargeable** contenant tout le projet
-- Structure full-stack complète : `backend + frontend + documentation`
-- Système de presets (templates prédéfinis : SaaS, API, e-commerce…)
-- Génération de Dockerfile + docker-compose automatiques
-- Validation de schémas avec Zod / Joi
-- Export direct vers un dépôt GitHub
-
-### 🚀 Version stable (objectif long terme)
-- Interface avancée façon IDE  
-- Personnalisation visuelle du projet généré  
-- Connexion à une base cloud pour héberger les projets générés  
-- Collaboration en temps réel (générer à plusieurs)  
-- Assistant IA intégré pour continuer le développement du projet généré  
-- Marketplace de templates créés par la communauté  
-
----
-
-## 🧩 Structure du projet
-
-Le dépôt se présente comme un **monorepo simple** :
-
+### ✔️ Une arborescence professionnelle
 ```
-CODEFLOW-AI/
-│
-├── backend/        → API Express + moteur Groq + génération
-│   ├── src/
-│   └── generated/   → fichiers générés par l’IA
-│
-├── frontend/       → Interface React (Vite)
-│   ├── src/
-│   └── public/images/   → logos + illustrations
-│
-└── codegen/        → templates + prompts (bientôt utilisés)
+src/
+ ├── config/
+ ├── controllers/
+ ├── models/
+ ├── routes/
+ ├── services/
+ ├── server.js
 ```
 
+### ✔️ Des fichiers complets prêts à être utilisés  
+- `server.js` (Express, CORS, logger, autoload routes)  
+- Config JWT  
+- Config base de données  
+- Modèles (selon les entités identifiées)  
+- Services CRUD complets  
+- Controllers propres avec gestion des erreurs  
+- Routes mappées automatiquement  
+- Docker-compose (PostgreSQL)  
+- `.env.example`  
+- README backend généré automatiquement  
+
+Le code est **propre, modulaire et cohérent**.
+
 ---
 
-## 🛠️ Installation et lancement
+## 🔹 2. Moteur “Refactor File” — Modifier un fichier existant par IA
 
-### 1. Lancer le backend
+L’endpoint `/api/generate/refactor-file` permet :
+
+- d’éditer un fichier existant,  
+- sans jamais supprimer le code présent,  
+- en ajoutant uniquement ce qui est demandé,  
+- en respectant la syntaxe du projet,  
+- en produisant un résultat propre.
+
+Exemple d’instruction :  
+> “Ajoute une route GET /users qui renvoie un tableau JSON, sans supprimer le code existant.”
+
+---
+
+## 🔹 3. Édition type VSCode dans le frontend
+
+Le frontend propose déjà :
+
+- un explorateur de fichiers avec icônes (dossiers, JS, JSON…)  
+- un éditeur intégré (Monaco Editor)  
+- sélection d’un fichier → affichage du contenu  
+- mode édition IA :  
+  - “Tu modifies : src/routes/users.js”  
+  - champ instruction séparé du prompt principal  
+
+---
+
+## 🔹 4. Export des fichiers générés
+
+Le backend écrit automatiquement le projet généré dans :
+
+```
+backend/generated/<nom-du-projet>
+```
+
+Préparé pour :
+- ZIP export,  
+- push GitHub automatique (bientôt),  
+- téléchargement complet.
+
+---
+
+# 🚧 Roadmap à venir
+
+### 🔥 En développement
+- Génération frontend (React / Next / Tailwind)  
+- Génération ZIP téléchargeable  
+- Templates pré‑configurés (SaaS, e‑commerce, API…)  
+- Dockerfile + docker-compose complets  
+- Validation des schémas (Zod/Joi)  
+
+### 🚀 Version finale
+- Interface complète façon IDE  
+- Projets full‑stack complets  
+- Collaboration temps réel  
+- Assistant IA intégré au projet généré  
+- Marketplace de templates  
+
+---
+
+# 🛠 Installation
+
+## Backend
 ```
 cd backend
 npm install
 npm start
 ```
-
-Le backend démarre sur :  
 👉 http://localhost:4000
 
-### 2. Lancer le frontend
+## Frontend
 ```
 cd frontend
 npm install
 npm run dev
 ```
-
-Le frontend démarre sur :  
 👉 http://localhost:5173
 
 ---
 
-## 🧪 Exemple de prompt
+# 🧪 Exemple de prompt
 
-> **“Crée un backend Node.js avec Express, authentification JWT, gestion utilisateurs, CRUD tasks, PostgreSQL et Dockerfile.”**
-
-Résultat :
-- architecture complète proposée  
-- fichiers listés  
-- code généré  
-- aperçu utilisable directement  
-- possibilité de copier-coller chaque fichier
+> “Crée une API Express avec CRUD utilisateurs, JWT et base PostgreSQL.”
 
 ---
 
-## 💬 Statut actuel
+# 💬 Statut actuel
 
-CodeFlow AI est en **version bêta** :  
-- stable pour la génération de backends simples,
-- en cours de transition vers un générateur full-stack complet,
-- avec une interface encore minimaliste mais déjà agréable et évolutive.
+CodeFlow AI est en **bêta stable** :
+- Génération backend solide  
+- Refactor file fonctionnel  
+- Interface file explorer + éditeur IA opérationnelle  
+- Base prête pour le full‑stack  
 
-Chaque mise à jour rapproche CodeFlow AI de son but :
-> **devenir la plateforme la plus rapide pour générer une application complète.**
-
----
-
-## ❤️ Contributeurs & objectifs
-
-Ce projet a pour ambition de devenir un véritable outil SaaS.  
-Toute contribution, idée ou amélioration est la bienvenue — le but est de créer un outil réellement utile aux développeurs de tous niveaux.
+Chaque mise à jour rapproche CodeFlow AI de son objectif :  
+> **Devenir la plateforme la plus rapide pour créer un projet complet.**
 
 ---
 
-## 🌟 Conclusion
+# ❤️ Contributeurs & objectifs
 
-CodeFlow AI n’en est qu’à ses débuts, mais les fondations sont déjà solides.  
-La vision est claire : créer la plateforme ultime permettant de générer un backend, un frontend, la documentation, les configurations… et un projet complet prêt à déployer.
-
-Ce n’est que le début. La suite arrive très vite.
+Toute idée ou amélioration est bienvenue pour faire évoluer CodeFlow AI vers un outil professionnel complet.
