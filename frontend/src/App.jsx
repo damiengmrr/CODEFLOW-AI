@@ -32,6 +32,7 @@ function App() {
   const [prompt, setPrompt] = useState(
     "Génère un backend pour une API de todo list avec utilisateurs, authentification JWT et base PostgreSQL"
   );
+  const [generatorMode, setGeneratorMode] = useState("backend");
   const [mode, setMode] = useState("backend-simple");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -46,6 +47,7 @@ function App() {
   const [zipMessage, setZipMessage] = useState("");
   const [aiEditing, setAiEditing] = useState(false);
   const [aiEditMessage, setAiEditMessage] = useState("");
+  const [uiRightTab, setUiRightTab] = useState("preview");
 
   const hasResult = !!result;
   const plan = result?.plan;
@@ -73,6 +75,19 @@ function App() {
     setPrompt(presetPrompt);
   };
 
+  const handleGeneratorModeChange = (newMode) => {
+    setGeneratorMode(newMode);
+    if (newMode === "backend") {
+      setPrompt(
+        "Génère un backend pour une API de todo list avec utilisateurs, authentification JWT et base PostgreSQL"
+      );
+    } else if (newMode === "frontend") {
+      setPrompt(
+        "Génère un frontend React + Vite + Tailwind pour un dashboard SaaS (layout, pages, composants UI)."
+      );
+    }
+  };
+
   const handleGenerate = async () => {
     setLoading(true);
     setError("");
@@ -86,7 +101,7 @@ function App() {
       const response = await fetch("http://localhost:4000/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({ prompt, mode: generatorMode }),
       });
 
       const data = await response.json();
@@ -163,7 +178,8 @@ function App() {
 
   const handleLoadFromHistory = (entry) => {
     setPrompt(entry.prompt);
-    setMode(entry.mode);
+    if (entry.backendMode) setMode(entry.backendMode);
+    if (entry.generatorMode) setGeneratorMode(entry.generatorMode);
     setResult({ plan: entry.plan, files: entry.files });
     setSelectedFilePath(entry.files?.[0]?.path || "");
     setEditedFiles({});
@@ -378,7 +394,11 @@ function App() {
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
         rows={compact ? 2 : 3}
-        placeholder="Décris le backend que tu veux générer..."
+        placeholder={
+          generatorMode === "frontend"
+            ? "Décris le frontend (pages, layout, style) que tu veux générer..."
+            : "Décris le backend (API, base de données, auth) que tu veux générer..."
+        }
         style={{
           width: "100%",
           padding: compact ? "0.7rem 0.9rem" : "0.85rem 1rem",
@@ -413,50 +433,101 @@ function App() {
           }}
         >
           <span style={{ opacity: 0.7, alignSelf: "center" }}>＋ Presets :</span>
-          <button
-            type="button"
-            onClick={() =>
-              applyPresetPrompt(
-                "Génère un backend pour une API de todo list avec utilisateurs, authentification JWT et base PostgreSQL"
-              )
-            }
-            style={presetChipStyle}
-          >
-            Todo + JWT + Postgres
-          </button>
-          <button
-            type="button"
-            onClick={() =>
-              applyPresetPrompt(
-                "Génère un backend pour une API de blog avec gestion des articles, des commentaires et des utilisateurs, en Node.js + Express avec une base PostgreSQL."
-              )
-            }
-            style={presetChipStyle}
-          >
-            API Blog
-          </button>
-          <button
-            type="button"
-            onClick={() =>
-              applyPresetPrompt(
-                "Génère un backend e-commerce avec gestion des produits, des utilisateurs, des paniers et des commandes, en Node.js + Express avec PostgreSQL."
-              )
-            }
-            style={presetChipStyle}
-          >
-            API E-commerce
-          </button>
-          <button
-            type="button"
-            onClick={() =>
-              applyPresetPrompt(
-                "Tu es un expert en architectures SaaS. Génère le backend pour un SaaS d’abonnements mensuels (gestion des plans, clients, factures, rôles, webhooks de paiement, etc.) basé sur Node.js, Express et PostgreSQL."
-              )
-            }
-            style={presetChipStyle}
-          >
-            SaaS abonnements
-          </button>
+          {generatorMode === "backend" ? (
+            <>
+              <button
+                type="button"
+                onClick={() =>
+                  applyPresetPrompt(
+                    "Génère un backend pour une API de todo list avec utilisateurs, authentification JWT et base PostgreSQL"
+                  )
+                }
+                style={presetChipStyle}
+              >
+                Todo + JWT + Postgres
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  applyPresetPrompt(
+                    "Génère un backend pour une API de blog avec gestion des articles, des commentaires et des utilisateurs, en Node.js + Express avec une base PostgreSQL."
+                  )
+                }
+                style={presetChipStyle}
+              >
+                API Blog
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  applyPresetPrompt(
+                    "Génère un backend e-commerce avec gestion des produits, des utilisateurs, des paniers et des commandes, en Node.js + Express avec PostgreSQL."
+                  )
+                }
+                style={presetChipStyle}
+              >
+                API E-commerce
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  applyPresetPrompt(
+                    "Tu es un expert en architectures SaaS. Génère le backend pour un SaaS d’abonnements mensuels (gestion des plans, clients, factures, rôles, webhooks de paiement, etc.) basé sur Node.js, Express et PostgreSQL."
+                  )
+                }
+                style={presetChipStyle}
+              >
+                SaaS abonnements
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() =>
+                  applyPresetPrompt(
+                    "Génère un frontend React + Vite + Tailwind pour un dashboard SaaS de gestion de projets avec sidebar, topbar, cards de stats et vue liste de projets."
+                  )
+                }
+                style={presetChipStyle}
+              >
+                Dashboard SaaS
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  applyPresetPrompt(
+                    "Génère une landing page produit moderne en React + Tailwind (hero avec CTA, section features en 3 colonnes, témoignages et pricing)."
+                  )
+                }
+                style={presetChipStyle}
+              >
+                Landing produit
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  applyPresetPrompt(
+                    "Génère le frontend d’un espace client SaaS (page de connexion, page de profil, page paramètres) en React + Vite + Tailwind."
+                  )
+                }
+                style={presetChipStyle}
+              >
+                Espace client
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  applyPresetPrompt(
+                    "Génère une interface d’admin en React + Tailwind avec table de données filtrable, pagination et formulaire de création/édition."
+                  )
+                }
+                style={presetChipStyle}
+              >
+                Admin UI
+              </button>
+            </>
+          )}
         </div>
 
         <div
@@ -672,7 +743,7 @@ function App() {
               color: theme.textMuted,
             }}
           >
-            Mode : <strong style={{ color: theme.textMain }}>Backend</strong>
+            Mode : <strong style={{ color: theme.textMain }}>{generatorMode === "frontend" ? "Frontend" : "Backend"}</strong>
           </span>
         </div>
       </header>
@@ -713,7 +784,9 @@ function App() {
                   marginBottom: "0.25rem",
                 }}
               >
-                Décris ton backend, CODEFLOW génère les fichiers.
+                {generatorMode === "frontend"
+                  ? "Décris ton frontend, CODEFLOW génère l’interface."
+                  : "Décris ton backend, CODEFLOW génère les fichiers."}
               </h1>
               <p
                 style={{
@@ -722,9 +795,69 @@ function App() {
                   color: theme.textMuted,
                 }}
               >
-                Comme un chat avec un architecte backend : tu expliques, il te
-                renvoie un plan + du code prêt à coller.
+                {generatorMode === "frontend"
+                  ? "Tu expliques l’interface (pages, layout, style), CODEFLOW te renvoie un projet React + Vite + Tailwind prêt à lancer."
+                  : "Comme un chat avec un architecte backend : tu expliques, il te renvoie un plan + du code prêt à coller."}
               </p>
+            <div
+              style={{
+                marginTop: "0.6rem",
+                display: "flex",
+                gap: "0.5rem",
+                alignItems: "center",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: "0.78rem",
+                  color: theme.textMuted,
+                }}
+              >
+                Mode de génération :
+              </span>
+              <button
+                type="button"
+                onClick={() => handleGeneratorModeChange("backend")}
+                style={{
+                  padding: "0.25rem 0.9rem",
+                  borderRadius: 999,
+                  border:
+                    generatorMode === "backend"
+                      ? `1px solid ${theme.accent}`
+                      : `1px solid ${theme.border}`,
+                  background:
+                    generatorMode === "backend"
+                      ? "rgba(34,197,94,0.2)"
+                      : "rgba(15,23,42,0.95)",
+                  color: "#e5e7eb",
+                  fontSize: "0.78rem",
+                  cursor: "pointer",
+                }}
+              >
+                Backend
+              </button>
+              <button
+                type="button"
+                onClick={() => handleGeneratorModeChange("frontend")}
+                style={{
+                  padding: "0.25rem 0.9rem",
+                  borderRadius: 999,
+                  border:
+                    generatorMode === "frontend"
+                      ? `1px solid ${theme.accent}`
+                      : `1px solid ${theme.border}`,
+                  background:
+                    generatorMode === "frontend"
+                      ? "rgba(56,189,248,0.2)"
+                      : "rgba(15,23,42,0.95)",
+                  color: "#e5e7eb",
+                  fontSize: "0.78rem",
+                  cursor: "pointer",
+                }}
+              >
+                Frontend
+              </button>
+            </div>
             </div>
 
             {/* Mini "historique" en haut */}
@@ -899,6 +1032,41 @@ function App() {
                 }}
               >
                 Explorer
+              </div>
+
+              <div style={{ display:"flex", gap:"0.35rem", padding:"0.35rem 0.65rem", borderBottom:`1px solid ${theme.border}` }}>
+                <button
+                  type="button"
+                  onClick={() => handleGeneratorModeChange("backend")}
+                  style={{
+                    flex:1,
+                    padding:"0.25rem 0.3rem",
+                    borderRadius:4,
+                    border: generatorMode==="backend" ? `1px solid ${theme.accent}` : `1px solid ${theme.border}`,
+                    background: generatorMode==="backend" ? "rgba(0,122,204,0.3)" : "transparent",
+                    color:"#e5e7eb",
+                    fontSize:"0.72rem",
+                    cursor:"pointer"
+                  }}
+                >
+                  Backend
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleGeneratorModeChange("frontend")}
+                  style={{
+                    flex:1,
+                    padding:"0.25rem 0.3rem",
+                    borderRadius:4,
+                    border: generatorMode==="frontend" ? `1px solid ${theme.accent}` : `1px solid ${theme.border}`,
+                    background: generatorMode==="frontend" ? "rgba(0,122,204,0.3)" : "transparent",
+                    color:"#e5e7eb",
+                    fontSize:"0.72rem",
+                    cursor:"pointer"
+                  }}
+                >
+                  Frontend
+                </button>
               </div>
 
               <div
@@ -1355,7 +1523,7 @@ function App() {
                   </div>
                 </div>
 
-                {/* Panneau JSON / debug */}
+                {/* Panneau JSON / debug ou Live Preview / UI Builder */}
                 <div
                   style={{
                     flex: 2,
@@ -1365,99 +1533,444 @@ function App() {
                     minWidth: 0,
                   }}
                 >
-                  <div
-                    style={{
-                      padding: "0.45rem 0.85rem",
-                      borderBottom: `1px solid ${theme.border}`,
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      fontSize: "0.78rem",
-                    }}
-                  >
-                    <span>JSON brut (debug)</span>
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: "0.4rem",
-                        alignItems: "center",
-                      }}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => setShowRawResult((prev) => !prev)}
+                  {generatorMode === "frontend" ? (
+                    <>
+                      <div
                         style={{
-                          padding: "0.18rem 0.6rem",
-                          borderRadius: 999,
-                          border: `1px solid ${theme.border}`,
-                          background: "#2d2d2d",
-                          color: "#e5e7eb",
-                          cursor: "pointer",
-                          fontSize: "0.75rem",
-                        }}
-                      >
-                        {showRawResult ? "Masquer" : "Afficher"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleCopyRawResult}
-                        style={{
-                          padding: "0.18rem 0.6rem",
-                          borderRadius: 999,
-                          border: `1px solid ${theme.accent}`,
-                          background: "rgba(0,122,204,0.5)",
-                          color: "#e5e7eb",
-                          cursor: "pointer",
-                          fontSize: "0.75rem",
-                        }}
-                      >
-                        Copier le JSON
-                      </button>
-                    </div>
-                  </div>
-                  <div
-                    style={{
-                      flex: 1,
-                      padding: "0.5rem 0.7rem",
-                      overflow: "auto",
-                    }}
-                  >
-                    {showRawResult ? (
-                      <pre
-                        style={{
-                          margin: 0,
+                          padding: "0.45rem 0.85rem",
+                          borderBottom: `1px solid ${theme.border}`,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
                           fontSize: "0.78rem",
-                          lineHeight: 1.4,
-                          whiteSpace: "pre",
-                          color: "#e5e7eb",
+                          background:
+                            "linear-gradient(135deg,#020617,#020617 55%,#020617)",
                         }}
                       >
-                        <code>{JSON.stringify(result, null, 2)}</code>
-                      </pre>
-                    ) : (
-                      <p
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: "0.35rem",
+                            alignItems: "center",
+                          }}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => setUiRightTab("preview")}
+                            style={{
+                              padding: "0.22rem 0.75rem",
+                              borderRadius: 999,
+                              border:
+                                uiRightTab === "preview"
+                                  ? `1px solid ${theme.accent}`
+                                  : `1px solid ${theme.border}`,
+                              background:
+                                uiRightTab === "preview"
+                                  ? "rgba(0,122,204,0.35)"
+                                  : "rgba(15,23,42,0.9)",
+                              color: "#e5e7eb",
+                              cursor: "pointer",
+                              fontSize: "0.75rem",
+                            }}
+                          >
+                            Live Preview
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setUiRightTab("builder")}
+                            style={{
+                              padding: "0.22rem 0.75rem",
+                              borderRadius: 999,
+                              border:
+                                uiRightTab === "builder"
+                                  ? `1px solid ${theme.accent}`
+                                  : `1px solid ${theme.border}`,
+                              background:
+                                uiRightTab === "builder"
+                                  ? "rgba(0,122,204,0.35)"
+                                  : "rgba(15,23,42,0.9)",
+                              color: "#e5e7eb",
+                              cursor: "pointer",
+                              fontSize: "0.75rem",
+                            }}
+                          >
+                            UI Builder (beta)
+                          </button>
+                        </div>
+                        <span
+                          style={{
+                            opacity: 0.75,
+                            fontSize: "0.72rem",
+                          }}
+                        >
+                          {uiRightTab === "preview"
+                            ? "Rendu de index.html généré par l’IA"
+                            : "Glisser-déposer bientôt dispo (concept UI)"}
+                        </span>
+                      </div>
+
+                      <div
                         style={{
-                          margin: 0,
-                          fontSize: "0.8rem",
-                          color: "#9ca3af",
+                          flex: 1,
+                          padding: "0.7rem",
+                          background:
+                            "radial-gradient(circle at top,#020617,#020617 55%,#000 100%)",
+                          overflow: "hidden",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
                         }}
                       >
-                        Clique sur &quot;Afficher&quot; pour voir le JSON brut
-                        renvoyé par l&apos;API (plan + fichiers).
-                      </p>
-                    )}
-                    {rawCopyMessage && (
-                      <p
+                        {uiRightTab === "preview" ? (
+                          (() => {
+                            const indexFile = files.find(
+                              (f) => f.path === "index.html"
+                            );
+                            if (!indexFile) {
+                              return (
+                                <p
+                                  style={{
+                                    color: "#9ca3af",
+                                    fontSize: "0.82rem",
+                                  }}
+                                >
+                                  Aucun <code>index.html</code> généré pour
+                                  l’instant. Lance une génération frontend pour
+                                  voir l’aperçu ici.
+                                </p>
+                              );
+                            }
+
+                            // Custom logic to show a placeholder if index.html is a standard React/Vite entry
+                            const rawHtml = editedFiles["index.html"] ?? indexFile.content;
+
+                            const looksLikeReactEntry =
+                              rawHtml.includes('id="root"') &&
+                              (rawHtml.includes('src="/src/main.jsx"') ||
+                                rawHtml.includes('src="src/main.jsx"'));
+
+                            const srcDoc = looksLikeReactEntry
+                              ? `<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Preview React – CODEFLOW</title>
+    <style>
+      html, body { margin: 0; padding: 0; height: 100%; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif; background: radial-gradient(circle at top,#020617,#020617 55%,#000); color: #e5e7eb; }
+      .cfw-preview-shell { display: flex; align-items: center; justify-content: center; height: 100%; padding: 24px; box-sizing: border-box; }
+      .cfw-preview-card { max-width: 540px; width: 100%; border-radius: 18px; padding: 20px 22px; background: linear-gradient(135deg,rgba(15,23,42,0.95),rgba(30,64,175,0.85)); box-shadow: 0 22px 60px rgba(15,23,42,0.95), 0 0 0 1px rgba(148,163,184,0.35); }
+      .cfw-preview-card h1 { margin: 0 0 6px; font-size: 16px; }
+      .cfw-preview-card p { margin: 0 0 10px; font-size: 13px; opacity: 0.9; }
+      .cfw-preview-card ol { margin: 0; padding-left: 18px; font-size: 12px; opacity: 0.9; }
+      .cfw-preview-card li { margin-bottom: 4px; }
+      .cfw-badge { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 999px; background: rgba(15,23,42,0.9); border: 1px solid rgba(52,211,153,0.6); font-size: 11px; margin-bottom: 8px; }
+      .cfw-dot { width: 8px; height: 8px; border-radius: 999px; background: #34d399; }
+      code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-size: 11px; }
+    </style>
+  </head>
+  <body>
+    <div class="cfw-preview-shell">
+      <div class="cfw-preview-card">
+        <div class="cfw-badge"><span class="cfw-dot"></span><span>Frontend React généré</span></div>
+        <h1>Ton dashboard React + Tailwind est prêt ✅</h1>
+        <p>Le projet React + Vite + Tailwind a bien été généré. Pour voir le vrai rendu interactif (router, états, composants), lance le projet en local :</p>
+        <ol>
+          <li>Exporte le code avec le bouton <code>Exporter en .zip</code>.</li>
+          <li>Dans le dossier frontend généré, exécute : <code>npm install</code> puis <code>npm run dev</code>.</li>
+          <li>Ouvre <code>http://localhost:5173</code> dans ton navigateur.</li>
+        </ol>
+      </div>
+    </div>
+  </body>
+</html>`
+                              : rawHtml;
+
+                            return (
+                              <div
+                                style={{
+                                  width: "100%",
+                                  height: "100%",
+                                  maxWidth: 1100,
+                                  maxHeight: 700,
+                                  borderRadius: 22,
+                                  background: "rgba(2,6,23,0.7)",
+                                  backdropFilter: "blur(18px)",
+                                  border: "1px solid rgba(255,255,255,0.06)",
+                                  boxShadow:
+                                    "0 25px 80px rgba(0,0,0,0.9), 0 0 60px rgba(30,64,175,0.55), inset 0 0 60px rgba(34,197,94,0.15)",
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  overflow: "hidden",
+                                  transition: "0.25s ease"
+                                }}
+                              >
+                                {/* Fake browser chrome */}
+                                <div
+                                  style={{
+                                    height: 36,
+                                    background:
+                                      "linear-gradient(90deg,#0b1120,#0f172a,#020617)",
+                                    borderBottom: "1px solid rgba(15,23,42,0.9)",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    padding: "0 0.6rem",
+                                    gap: "0.5rem",
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      gap: 6,
+                                    }}
+                                  >
+                                    <span
+                                      style={{
+                                        width: 10,
+                                        height: 10,
+                                        borderRadius: "999px",
+                                        background: "#f97373",
+                                        opacity: 0.95,
+                                      }}
+                                    />
+                                    <span
+                                      style={{
+                                        width: 10,
+                                        height: 10,
+                                        borderRadius: "999px",
+                                        background: "#facc15",
+                                        opacity: 0.9,
+                                      }}
+                                    />
+                                    <span
+                                      style={{
+                                        width: 10,
+                                        height: 10,
+                                        borderRadius: "999px",
+                                        background: "#22c55e",
+                                        opacity: 0.9,
+                                      }}
+                                    />
+                                  </div>
+                                  <div
+                                    style={{
+                                      flex: 1,
+                                      marginLeft: 10,
+                                      borderRadius: 999,
+                                      background: "rgba(15,23,42,0.95)",
+                                      border:
+                                        "1px solid rgba(148,163,184,0.4)",
+                                      padding: "0.15rem 0.6rem",
+                                      fontSize: "0.72rem",
+                                      color: "#9ca3af",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: "0.35rem",
+                                    }}
+                                  >
+                                    <span
+                                      style={{
+                                        width: 10,
+                                        height: 10,
+                                        borderRadius: "999px",
+                                        background: theme.accent,
+                                        opacity: 0.9,
+                                      }}
+                                    />
+                                    <span
+                                      style={{
+                                        whiteSpace: "nowrap",
+                                        overflow: "hidden",
+                                        textOverflow: "ellipsis",
+                                      }}
+                                    >
+                                      http://localhost:5173
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* Actual iframe */}
+                                <div
+                                  style={{
+                                    flex: 1,
+                                    background: "#111827",
+                                  }}
+                                >
+                                  <iframe
+                                    title="preview"
+                                    srcDoc={srcDoc}
+                                    style={{
+                                      width: "100%",
+                                      height: "100%",
+                                      border: "none",
+                                      background: "white",
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })()
+                        ) : (
+                          <div
+                            style={{
+                              width: "100%",
+                              maxWidth: 640,
+                              borderRadius: 18,
+                              padding: "1.1rem 1.2rem",
+                              background:
+                                "linear-gradient(135deg,rgba(15,23,42,0.95),rgba(30,64,175,0.75))",
+                              boxShadow:
+                                "0 25px 80px rgba(15,23,42,0.85), 0 0 0 1px rgba(30,64,175,0.7)",
+                              color: "#e5e7eb",
+                              fontSize: "0.85rem",
+                            }}
+                          >
+                            <p style={{margin:0, marginBottom:"0.7rem", opacity:0.8}}>
+                              🚧 Interface en construction – bientôt : composants drag & drop, grille Tailwind visuelle, export automatique vers React.
+                            </p>
+                            <h3
+                              style={{
+                                margin: 0,
+                                marginBottom: "0.4rem",
+                                fontSize: "0.9rem",
+                              }}
+                            >
+                              UI Builder (bientôt)
+                            </h3>
+                            <p
+                              style={{
+                                margin: 0,
+                                marginBottom: "0.6rem",
+                                opacity: 0.9,
+                              }}
+                            >
+                              Cette zone deviendra un vrai &quot;builder&quot; visuel
+                              (drag &amp; drop de blocs UI, presets de sections,
+                              etc.). Pour l’instant, tu peux déjà générer ton
+                              frontend complet via le prompt à gauche, puis
+                              affiner le code dans l’éditeur central.
+                            </p>
+                            <ul
+                              style={{
+                                margin: 0,
+                                paddingLeft: "1.1rem",
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: "0.25rem",
+                              }}
+                            >
+                              <li>Prévisualisation live du rendu généré.</li>
+                              <li>
+                                Prochaine étape : ajout / réorganisation de blocs
+                                (hero, cards, tableaux, formulaires…).
+                              </li>
+                              <li>
+                                Export direct du layout vers les fichiers React.
+                              </li>
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    // JSON debug panel (backend)
+                    <>
+                      <div
                         style={{
-                          marginTop: "0.4rem",
-                          fontSize: "0.8rem",
-                          color: "#a5b4fc",
+                          padding: "0.45rem 0.85rem",
+                          borderBottom: `1px solid ${theme.border}`,
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          fontSize: "0.78rem",
                         }}
                       >
-                        {rawCopyMessage}
-                      </p>
-                    )}
-                  </div>
+                        <span>JSON brut (debug)</span>
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: "0.4rem",
+                            alignItems: "center",
+                          }}
+                        >
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setShowRawResult((prev) => !prev)
+                            }
+                            style={{
+                              padding: "0.18rem 0.6rem",
+                              borderRadius: 999,
+                              border: `1px solid ${theme.border}`,
+                              background: "#2d2d2d",
+                              color: "#e5e7eb",
+                              cursor: "pointer",
+                              fontSize: "0.75rem",
+                            }}
+                          >
+                            {showRawResult ? "Masquer" : "Afficher"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleCopyRawResult}
+                            style={{
+                              padding: "0.18rem 0.6rem",
+                              borderRadius: 999,
+                              border: `1px solid ${theme.accent}`,
+                              background: "rgba(0,122,204,0.5)",
+                              color: "#e5e7eb",
+                              cursor: "pointer",
+                              fontSize: "0.75rem",
+                            }}
+                          >
+                            Copier le JSON
+                          </button>
+                        </div>
+                      </div>
+                      <div
+                        style={{
+                          flex: 1,
+                          padding: "0.5rem 0.7rem",
+                          overflow: "auto",
+                        }}
+                      >
+                        {showRawResult ? (
+                          <pre
+                            style={{
+                              margin: 0,
+                              fontSize: "0.78rem",
+                              lineHeight: 1.4,
+                              whiteSpace: "pre",
+                              color: "#e5e7eb",
+                            }}
+                          >
+                            <code>{JSON.stringify(result, null, 2)}</code>
+                          </pre>
+                        ) : (
+                          <p
+                            style={{
+                              margin: 0,
+                              fontSize: "0.8rem",
+                              color: "#9ca3af",
+                            }}
+                          >
+                            Clique sur &quot;Afficher&quot; pour voir le JSON brut
+                            renvoyé par l&apos;API (plan + fichiers).
+                          </p>
+                        )}
+                        {rawCopyMessage && (
+                          <p
+                            style={{
+                              marginTop: "0.4rem",
+                              fontSize: "0.8rem",
+                              color: "#a5b4fc",
+                            }}
+                          >
+                            {rawCopyMessage}
+                          </p>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 

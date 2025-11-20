@@ -819,6 +819,9 @@ CODEFLOW-AI te fournit une base structurée : à toi d'y ajouter ta logique mét
  * Retourne un tableau de { path, content }
  */
 function generateFilesFromPlan(plan = {}) {
+  if (plan.mode === 'frontend') {
+    return generateFrontendFiles(plan);
+  }
   const files = [];
 
   const entities = Array.isArray(plan.entities) ? plan.entities : [];
@@ -910,6 +913,735 @@ function generateFilesFromPlan(plan = {}) {
   return files;
 }
 
+function generateFrontendFiles(plan = {}) {
+  const files = [];
+
+  // Récupérer quelques infos du plan pour personnaliser un peu
+  const appDescription = plan.description || plan.title || 'Dashboard SaaS généré avec CODEFLOW-AI';
+  const pagesFromPlan = Array.isArray(plan.pages) ? plan.pages : [];
+
+  // Pages par défaut si l'IA n’a pas tout rempli
+  const defaultPages = [
+    {
+      name: 'Home',
+      path: '/',
+      title: 'Accueil',
+      description: "Vue d’ensemble de ton application SaaS",
+      kind: 'landing',
+    },
+    {
+      name: 'Projects',
+      path: '/projects',
+      title: 'Projets',
+      description: 'Liste et suivi de tes projets',
+      kind: 'app',
+    },
+    {
+      name: 'Settings',
+      path: '/settings',
+      title: 'Paramètres',
+      description: 'Configuration du compte et de l’application',
+      kind: 'app',
+    },
+  ];
+
+  const pages = pagesFromPlan.length ? pagesFromPlan : defaultPages;
+
+  // Couleurs / design
+  const primaryColor = plan.design?.primaryColor || '#6366f1'; // indigo-500
+  const accentColor = plan.design?.accentColor || '#f97316'; // orange-500
+
+  // 1) index.html avec GSAP en CDN pour les animations
+  files.push({
+    path: 'index.html',
+    content: `
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${appDescription}</title>
+    <meta name="description" content="${appDescription}" />
+    <!-- Font & base styles -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap"
+      rel="stylesheet"
+    />
+    <!-- GSAP CDN pour les animations -->
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js" defer></script>
+  </head>
+  <body class="bg-slate-950 text-slate-50">
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
+`.trim(),
+  });
+
+  // 2) Config Vite + Tailwind + PostCSS
+  files.push({
+    path: 'vite.config.js',
+    content: `
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    port: 5173,
+  },
+});
+`.trim(),
+  });
+
+  files.push({
+    path: 'postcss.config.js',
+    content: `
+export default {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+};
+`.trim(),
+  });
+
+  files.push({
+    path: 'tailwind.config.js',
+    content: `
+export default {
+  content: ['./index.html', './src/**/*.{js,jsx,ts,tsx}'],
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+      },
+      colors: {
+        brand: {
+          primary: '${primaryColor}',
+          accent: '${accentColor}',
+        },
+      },
+      boxShadow: {
+        soft: '0 18px 45px rgba(15,23,42,0.7)',
+      },
+    },
+  },
+  plugins: [],
+};
+`.trim(),
+  });
+
+  // 3) Global CSS (scrollbars, background, etc.)
+  files.push({
+    path: 'src/styles/global.css',
+    content: `
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-slate-950 text-slate-50 antialiased;
+}
+
+/* Scrollbar custom */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #020617;
+}
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
+
+/* Cards et effets utilitaires */
+.app-glass {
+  @apply bg-slate-900/70 border border-slate-800/70 backdrop-blur-xl shadow-soft;
+}
+
+.app-badge {
+  @apply inline-flex items-center rounded-full bg-slate-900/70 border border-slate-700/80 px-3 py-1 text-xs font-medium text-slate-200;
+}
+
+.app-pill {
+  @apply inline-flex items-center rounded-full bg-brand-accent/10 text-brand-accent px-3 py-1 text-xs font-medium;
+}
+`.trim(),
+  });
+
+  // 4) main.jsx avec React Router
+  files.push({
+    path: 'src/main.jsx',
+    content: `
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
+import App from './App';
+import './styles/global.css';
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
+  </React.StrictMode>,
+);
+`.trim(),
+  });
+
+  // 5) Fichier de config des pages (dérivé du plan)
+  files.push({
+    path: 'src/config/pages.js',
+    content: `
+export const pages = ${JSON.stringify(
+      pages.map((p) => ({
+        name: p.name || 'Page',
+        path: p.path || '/',
+        title: p.title || p.name || 'Page',
+        description:
+          p.description ||
+          'Section générée automatiquement par CODEFLOW-AI.',
+        kind: p.kind || 'app',
+      })),
+      null,
+      2,
+    )};
+`.trim(),
+  });
+
+  // 6) Composants UI basiques (KPI, SectionCard)
+  files.push({
+    path: 'src/components/ui/KpiCard.jsx',
+    content: `
+export function KpiCard({ label, value, helper }) {
+  return (
+    <div className="app-glass rounded-2xl p-4 flex flex-col gap-1">
+      <span className="text-xs uppercase tracking-wide text-slate-400">
+        {label}
+      </span>
+      <span className="text-2xl font-semibold text-slate-50">{value}</span>
+      {helper ? (
+        <span className="text-xs text-slate-400 mt-1">{helper}</span>
+      ) : null}
+    </div>
+  );
+}
+`.trim(),
+  });
+
+  files.push({
+    path: 'src/components/ui/SectionCard.jsx',
+    content: `
+export function SectionCard({ title, description, children, badge }) {
+  return (
+    <section className="app-glass rounded-2xl p-6 flex flex-col gap-3">
+      <header className="flex items-center justify-between gap-2">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-50">{title}</h2>
+          {description ? (
+            <p className="text-sm text-slate-400 mt-1">{description}</p>
+          ) : null}
+        </div>
+        {badge ? <span className="app-badge">{badge}</span> : null}
+      </header>
+      <div className="mt-2">{children}</div>
+    </section>
+  );
+}
+`.trim(),
+  });
+
+  // 7) Petit hook d’animation avec GSAP global (via CDN)
+  files.push({
+    path: 'src/hooks/useGsapFadeIn.js',
+    content: `
+import { useEffect, useRef } from 'react';
+
+export function useGsapFadeIn(options = {}) {
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    // On utilise window.gsap injecté par le CDN dans index.html
+    if (typeof window !== 'undefined' && window.gsap) {
+      window.gsap.fromTo(
+        el,
+        { opacity: 0, y: 12 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: options.duration || 0.7,
+          delay: options.delay || 0,
+          ease: options.ease || 'power3.out',
+        },
+      );
+    }
+  }, [options.duration, options.delay, options.ease]);
+
+  return ref;
+}
+`.trim(),
+  });
+
+  // 8) Layout complet (Sidebar + Topbar + zone de contenu)
+  files.push({
+    path: 'src/components/layout/Sidebar.jsx',
+    content: `
+import { NavLink } from 'react-router-dom';
+import { pages } from '../../config/pages';
+
+const baseClasses =
+  'flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150';
+const inactiveClasses =
+  'text-slate-400 hover:text-slate-100 hover:bg-slate-800/80';
+const activeClasses =
+  'text-slate-50 bg-brand-primary/90 shadow-soft shadow-brand-primary/30';
+
+export function Sidebar() {
+  return (
+    <aside className="hidden md:flex md:flex-col md:w-64 h-full border-r border-slate-800/80 bg-slate-950/80 backdrop-blur-xl">
+      <div className="px-4 pt-4 pb-3 flex items-center gap-2 border-b border-slate-800/70">
+        <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-brand-primary to-brand-accent flex items-center justify-center text-xs font-black tracking-tight">
+          CF
+        </div>
+        <div className="flex flex-col">
+          <span className="text-sm font-semibold text-slate-50">
+            CODEFLOW-AI
+          </span>
+          <span className="text-xs text-slate-400">
+            Frontend généré
+          </span>
+        </div>
+      </div>
+
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        {pages.map((page) => (
+          <NavLink
+            key={page.path}
+            to={page.path}
+            className={({ isActive }) =>
+              [
+                baseClasses,
+                isActive ? activeClasses : inactiveClasses,
+              ].join(' ')
+            }
+          >
+            <span className="h-2 w-2 rounded-full bg-brand-accent/80" />
+            <span>{page.title}</span>
+          </NavLink>
+        ))}
+      </nav>
+
+      <div className="px-4 py-3 border-t border-slate-800/70 text-xs text-slate-500">
+        <p>Généré par CODEFLOW-AI ✨</p>
+      </div>
+    </aside>
+  );
+}
+`.trim(),
+  });
+
+  files.push({
+    path: 'src/components/layout/Topbar.jsx',
+    content: `
+import { useLocation } from 'react-router-dom';
+import { pages } from '../../config/pages';
+
+export function Topbar() {
+  const location = useLocation();
+  const current =
+    pages.find((p) => p.path === location.pathname) || pages[0];
+
+  return (
+    <header className="flex items-center justify-between gap-4 px-4 py-3 border-b border-slate-800/70 bg-slate-950/80 backdrop-blur-xl">
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-2">
+          <span className="app-pill text-xs">
+            {current.kind === 'landing' ? 'Overview' : 'Module'}
+          </span>
+          <h1 className="text-lg md:text-xl font-semibold text-slate-50">
+            {current.title}
+          </h1>
+        </div>
+        {current.description ? (
+          <p className="text-xs md:text-sm text-slate-400">
+            {current.description}
+          </p>
+        ) : null}
+      </div>
+
+      <div className="flex items-center gap-3">
+        <button className="hidden md:inline-flex items-center gap-2 rounded-xl border border-slate-700/80 bg-slate-900/70 px-3 py-1.5 text-xs font-medium text-slate-200 hover:border-slate-500 hover:bg-slate-900">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+          Live preview
+        </button>
+        <button className="inline-flex items-center gap-2 rounded-xl bg-brand-primary px-3 py-1.5 text-xs font-semibold text-slate-50 shadow-soft hover:bg-brand-primary/90">
+          <span className="h-1.5 w-1.5 rounded-full bg-brand-accent" />
+          Sauvegarder
+        </button>
+      </div>
+    </header>
+  );
+}
+`.trim(),
+  });
+
+  files.push({
+    path: 'src/components/layout/AppLayout.jsx',
+    content: `
+export function AppLayout({ children }) {
+  return (
+    <div className="h-screen w-full flex bg-slate-950 text-slate-50">
+      {children}
+    </div>
+  );
+}
+`.trim(),
+  });
+
+  // 9) Pages complètes
+
+  files.push({
+    path: 'src/pages/HomePage.jsx',
+    content: `
+import { useGsapFadeIn } from '../hooks/useGsapFadeIn';
+import { KpiCard } from '../components/ui/KpiCard';
+import { SectionCard } from '../components/ui/SectionCard';
+
+export function HomePage() {
+  const heroRef = useGsapFadeIn({ delay: 0.1 });
+  const statsRef = useGsapFadeIn({ delay: 0.2 });
+  const sectionsRef = useGsapFadeIn({ delay: 0.3 });
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <main className="flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-6 space-y-6">
+        {/* Hero */}
+        <section
+          ref={heroRef}
+          className="app-glass rounded-3xl px-5 py-6 md:px-7 md:py-7 flex flex-col lg:flex-row gap-6 lg:gap-8 items-start lg:items-center"
+        >
+          <div className="flex-1 space-y-3">
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="app-pill">
+                Dashboard généré automatiquement
+              </span>
+              <span className="app-badge">
+                Frontend React + Vite + Tailwind
+              </span>
+            </div>
+            <h2 className="text-2xl md:text-3xl lg:text-4xl font-semibold tracking-tight">
+              Construis ton interface SaaS en quelques secondes.
+            </h2>
+            <p className="text-sm md:text-base text-slate-300 max-w-2xl">
+              Cette interface a été générée à partir d&apos;une simple
+              description. Personnalise les sections, branche-la à ton
+              API, et déploie ton produit plus vite que jamais.
+            </p>
+            <div className="flex flex-wrap gap-3 mt-2">
+              <button className="inline-flex items-center justify-center rounded-xl bg-brand-primary px-4 py-2 text-sm font-semibold text-slate-50 shadow-soft hover:bg-brand-primary/90">
+                Commencer à personnaliser
+              </button>
+              <button className="inline-flex items-center justify-center rounded-xl border border-slate-700/80 bg-slate-900/70 px-4 py-2 text-sm font-medium text-slate-200 hover:border-slate-500">
+                Voir la structure du code
+              </button>
+            </div>
+          </div>
+
+          <div className="w-full lg:w-72 xl:w-80 flex flex-col gap-3">
+            <div className="app-glass rounded-2xl p-4 text-xs text-slate-300 space-y-2">
+              <p className="font-semibold text-slate-50">
+                Génération intelligente
+              </p>
+              <p>
+                CODEFLOW-AI analyse ta description pour proposer une
+                structure de pages, des sections, et des composants
+                adaptés à ton cas d&apos;usage.
+              </p>
+              <p className="text-[11px] text-slate-500">
+                Modifie ce contenu à ta guise, ou utilise-le comme point
+                de départ pour ton design final.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* KPIs */}
+        <section ref={statsRef} className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <KpiCard
+            label="Projets actifs"
+            value="12"
+            helper="Basé sur les données de ton API (exemple statique)."
+          />
+          <KpiCard
+            label="Tâches complétées"
+            value="87%"
+            helper="Tu peux brancher cette métrique sur un endpoint réel."
+          />
+          <KpiCard
+            label="Temps moyen / sprint"
+            value="2.4 j"
+            helper="Parfait pour un tableau de bord produit / tech."
+          />
+        </section>
+
+        {/* Sections */}
+        <section
+          ref={sectionsRef}
+          className="grid grid-cols-1 lg:grid-cols-3 gap-4"
+        >
+          <SectionCard
+            title="Vue Kanban"
+            description="Ajoute ici ton propre composant Kanban (ex: Board de tâches)."
+            badge="Module Projets"
+          >
+            <div className="h-32 rounded-2xl border border-dashed border-slate-700/80 flex items-center justify-center text-xs text-slate-500">
+              Place ici un composant custom (Kanban, charts, tables...)
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            title="Timeline d’activité"
+            description="Un feed d’événements pour suivre ce qui se passe sur l’app."
+            badge="Activité"
+          >
+            <ul className="space-y-2 text-xs">
+              <li className="flex items-center gap-2">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                Nouveau projet créé (exemple statique).
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="h-1.5 w-1.5 rounded-full bg-sky-400" />
+                3 tâches complétées aujourd’hui.
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                1 sprint en retard.
+              </li>
+            </ul>
+          </SectionCard>
+
+          <SectionCard
+            title="Section pricing"
+            description="Parfaite pour un SaaS avec plusieurs plans."
+            badge="Monétisation"
+          >
+            <div className="grid grid-cols-1 gap-2 text-xs">
+              <div className="rounded-2xl border border-slate-700/80 bg-slate-900/60 px-3 py-2 flex items-center justify-between">
+                <div>
+                  <p className="font-semibold text-slate-50 text-sm">
+                    Starter
+                  </p>
+                  <p className="text-[11px] text-slate-400">
+                    Idéal pour tester l’app.
+                  </p>
+                </div>
+                <span className="text-sm font-semibold text-slate-50">
+                  9€ /mois
+                </span>
+              </div>
+              <div className="rounded-2xl border border-brand-primary/60 bg-brand-primary/10 px-3 py-2 flex items-center justify-between">
+                <div>
+                  <p className="font-semibold text-slate-50 text-sm">
+                    Pro
+                  </p>
+                  <p className="text-[11px] text-slate-300">
+                    Pour les équipes en croissance.
+                  </p>
+                </div>
+                <span className="text-sm font-semibold text-slate-50">
+                  29€ /mois
+                </span>
+              </div>
+            </div>
+          </SectionCard>
+        </section>
+      </main>
+    </div>
+  );
+}
+`.trim(),
+  });
+
+  files.push({
+    path: 'src/pages/ProjectsPage.jsx',
+    content: `
+import { useGsapFadeIn } from '../hooks/useGsapFadeIn';
+import { SectionCard } from '../components/ui/SectionCard';
+
+export function ProjectsPage() {
+  const listRef = useGsapFadeIn({ delay: 0.1 });
+
+  const projects = [
+    { id: 1, name: 'Refonte site marketing', status: 'En cours' },
+    { id: 2, name: 'Dashboard interne BI', status: 'En préparation' },
+    { id: 3, name: 'Onboarding SaaS', status: 'Terminé' },
+  ];
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <main className="flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-6 space-y-4">
+        <SectionCard
+          title="Projets"
+          description="Une liste de projets simple, à connecter à ton backend."
+          badge="Module Projets"
+        >
+          <div
+            ref={listRef}
+            className="rounded-2xl border border-slate-800/80 bg-slate-950/60 overflow-hidden text-sm"
+          >
+            <div className="grid grid-cols-3 px-3 py-2 text-xs font-semibold text-slate-400 border-b border-slate-800/80">
+              <span>Nom</span>
+              <span>Statut</span>
+              <span className="text-right pr-2">Actions</span>
+            </div>
+            <div className="divide-y divide-slate-800/80">
+              {projects.map((project) => (
+                <div
+                  key={project.id}
+                  className="grid grid-cols-3 px-3 py-2 text-xs md:text-sm text-slate-200 hover:bg-slate-900/60"
+                >
+                  <span>{project.name}</span>
+                  <span className="text-slate-400">{project.status}</span>
+                  <span className="text-right pr-2">
+                    <button className="inline-flex items-center rounded-lg border border-slate-700/80 px-2 py-1 text-[11px] hover:border-slate-500">
+                      Ouvrir
+                    </button>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </SectionCard>
+      </main>
+    </div>
+  );
+}
+`.trim(),
+  });
+
+  files.push({
+    path: 'src/pages/SettingsPage.jsx',
+    content: `
+import { useGsapFadeIn } from '../hooks/useGsapFadeIn';
+import { SectionCard } from '../components/ui/SectionCard';
+
+export function SettingsPage() {
+  const ref = useGsapFadeIn({ delay: 0.1 });
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <main className="flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-6 space-y-4">
+        <SectionCard
+          title="Paramètres du compte"
+          description="Exemple de formulaire à connecter à ton backend."
+          badge="Compte"
+        >
+          <form
+            ref={ref}
+            className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs md:text-sm"
+          >
+            <div className="flex flex-col gap-1">
+              <label className="text-slate-300">Nom complet</label>
+              <input
+                type="text"
+                placeholder="Ton nom"
+                className="rounded-xl border border-slate-700/80 bg-slate-900/70 px-3 py-2 text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-brand-primary/80"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-slate-300">Email</label>
+              <input
+                type="email"
+                placeholder="ton@mail.com"
+                className="rounded-xl border border-slate-700/80 bg-slate-900/70 px-3 py-2 text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-brand-primary/80"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-slate-300">Langue</label>
+              <select className="rounded-xl border border-slate-700/80 bg-slate-900/70 px-3 py-2 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-primary/80">
+                <option>Français</option>
+                <option>Anglais</option>
+              </select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-slate-300">Fuseau horaire</label>
+              <select className="rounded-xl border border-slate-700/80 bg-slate-900/70 px-3 py-2 text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-primary/80">
+                <option>Europe/Paris</option>
+                <option>UTC</option>
+              </select>
+            </div>
+            <div className="md:col-span-2 flex justify-end mt-2">
+              <button className="inline-flex items-center rounded-xl bg-brand-primary px-4 py-2 text-xs md:text-sm font-semibold text-slate-50 shadow-soft hover:bg-brand-primary/90">
+                Enregistrer les modifications
+              </button>
+            </div>
+          </form>
+        </SectionCard>
+      </main>
+    </div>
+  );
+}
+`.trim(),
+  });
+
+  // 10) App.jsx qui branche tout ça (layout + routes)
+  files.push({
+    path: 'src/App.jsx',
+    content: `
+import { Routes, Route } from 'react-router-dom';
+import { AppLayout } from './components/layout/AppLayout';
+import { Sidebar } from './components/layout/Sidebar';
+import { Topbar } from './components/layout/Topbar';
+import { HomePage } from './pages/HomePage';
+import { ProjectsPage } from './pages/ProjectsPage';
+import { SettingsPage } from './pages/SettingsPage';
+
+export default function App() {
+  return (
+    <AppLayout>
+      {/* Sidebar desktop */}
+      <Sidebar />
+
+      {/* Contenu principal */}
+      <div className="flex-1 flex flex-col h-full">
+        <Topbar />
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/projects" element={<ProjectsPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+        </Routes>
+      </div>
+    </AppLayout>
+  );
+}
+`.trim(),
+  });
+
+  return files;
+}
+
 module.exports = {
   generateFilesFromPlan,
+  generateFrontendFiles,
 };
