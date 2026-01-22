@@ -1108,22 +1108,76 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   });
 
   // 5) Fichier de config des pages (dérivé du plan)
+  const normalizedPages = pages.map((p) => {
+    const path = p.path || '/';
+    const name = p.name || 'Page';
+    const title = p.title || name || 'Page';
+
+    const lowerPath = String(path).toLowerCase();
+    const lowerName = String(name).toLowerCase();
+
+    let kind = p.kind;
+    if (!kind) {
+      if (
+        lowerPath === '/' ||
+        lowerPath === '/home' ||
+        lowerPath === '/dashboard'
+      ) {
+        kind = 'landing';
+      } else if (
+        lowerPath.includes('param') ||
+        lowerName.includes('param')
+      ) {
+        kind = 'settings';
+      } else if (
+        lowerPath.includes('projet') ||
+        lowerPath.includes('project') ||
+        lowerName.includes('projet') ||
+        lowerName.includes('project')
+      ) {
+        kind = 'projects';
+      } else {
+        kind = 'app';
+      }
+    }
+
+    let defaultDescription;
+    if (kind === 'settings') {
+      defaultDescription =
+        'Préférences du compte, notifications et sécurité.';
+    } else if (kind === 'projects') {
+      defaultDescription =
+        'Liste et gestion de vos projets en cours.';
+    } else if (kind === 'landing' || kind === 'dashboard') {
+      defaultDescription =
+        'Vue d’ensemble de votre tableau de bord et de vos indicateurs clés.';
+    } else {
+      defaultDescription =
+        'Section générée automatiquement avec du contenu prêt à l’emploi.';
+    }
+
+    const rawDesc = (p.description || '').trim();
+    const isPlaceholder =
+      !rawDesc ||
+      /remplace ce contenu/i.test(rawDesc) ||
+      /replace this content/i.test(rawDesc) ||
+      /add your components/i.test(rawDesc);
+
+    const description = isPlaceholder ? defaultDescription : rawDesc;
+
+    return {
+      name,
+      path,
+      title,
+      description,
+      kind,
+    };
+  });
+
   files.push({
     path: 'src/config/pages.js',
     content: `
-export const pages = ${JSON.stringify(
-      pages.map((p) => ({
-        name: p.name || 'Page',
-        path: p.path || '/',
-        title: p.title || p.name || 'Page',
-        description:
-          p.description ||
-          'Section générée automatiquement par CODEFLOW-AI.',
-        kind: p.kind || 'app',
-      })),
-      null,
-      2,
-    )};
+export const pages = ${JSON.stringify(normalizedPages, null, 2)};
 `.trim(),
   });
 
@@ -1199,6 +1253,42 @@ export function useGsapFadeIn(options = {}) {
   }, [options.duration, options.delay, options.ease]);
 
   return ref;
+}
+`.trim(),
+  });
+
+  // UI Builder simple preview
+  files.push({
+    path: 'src/ui-builder/Preview.jsx',
+    content: `
+import { HomePage } from '../pages/HomePage';
+import { ProjectsPage } from '../pages/ProjectsPage';
+import { SettingsPage } from '../pages/SettingsPage';
+
+/**
+ * UI Builder Preview
+ *
+ * Ce composant te permet de visualiser rapidement les blocs
+ * générés (home, projets, paramètres) dans une même vue.
+ * Tu peux le brancher à un onglet "UI Builder" dans ton SaaS.
+ */
+export function Preview() {
+  return (
+    <div className="flex flex-col gap-6 p-4">
+      <div className="rounded-2xl border border-slate-800/80 bg-slate-950/60 p-3 text-xs text-slate-400">
+        <p className="font-semibold text-slate-100 text-sm mb-1">
+          UI Builder – Aperçu des blocs
+        </p>
+        <p>
+          Cette page regroupe plusieurs sections pour te permettre de
+          parcourir rapidement le rendu de ton UI généré.
+        </p>
+      </div>
+      <HomePage />
+      <ProjectsPage />
+      <SettingsPage />
+    </div>
+  );
 }
 `.trim(),
   });
@@ -1412,11 +1502,39 @@ export function HomePage() {
         >
           <SectionCard
             title="Vue Kanban"
-            description="Ajoute ici ton propre composant Kanban (ex: Board de tâches)."
+            description="Visualise rapidement tes tâches par colonne."
             badge="Module Projets"
           >
-            <div className="h-32 rounded-2xl border border-dashed border-slate-700/80 flex items-center justify-center text-xs text-slate-500">
-              Place ici un composant custom (Kanban, charts, tables...)
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+              <div className="rounded-2xl border border-slate-700/80 bg-slate-900/60 p-3 flex flex-col gap-2">
+                <p className="text-[11px] font-semibold text-slate-300">
+                  À faire
+                </p>
+                <ul className="space-y-1 text-[11px] text-slate-400">
+                  <li>Créer la page d&apos;onboarding</li>
+                  <li>Configurer les permissions</li>
+                </ul>
+              </div>
+
+              <div className="rounded-2xl border border-slate-700/80 bg-slate-900/60 p-3 flex flex-col gap-2">
+                <p className="text-[11px] font-semibold text-slate-300">
+                  En cours
+                </p>
+                <ul className="space-y-1 text-[11px] text-slate-400">
+                  <li>Mettre à jour le dashboard</li>
+                  <li>Brancher l&apos;API projets</li>
+                </ul>
+              </div>
+
+              <div className="rounded-2xl border border-slate-700/80 bg-slate-900/60 p-3 flex flex-col gap-2">
+                <p className="text-[11px] font-semibold text-slate-300">
+                  Terminé
+                </p>
+                <ul className="space-y-1 text-[11px] text-slate-400">
+                  <li>Mise en place du design système</li>
+                  <li>Configuration de l&apos;authentification</li>
+                </ul>
+              </div>
             </div>
           </SectionCard>
 
@@ -1605,6 +1723,107 @@ export function SettingsPage() {
 `.trim(),
   });
 
+  // Page de connexion (Login)
+  files.push({
+    path: 'src/pages/LoginPage.jsx',
+    content: `
+import { useGsapFadeIn } from '../hooks/useGsapFadeIn';
+
+export function LoginPage() {
+  const ref = useGsapFadeIn({ delay: 0.05 });
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-950 px-4">
+      <div
+        ref={ref}
+        className="app-glass max-w-md w-full rounded-3xl px-6 py-7 flex flex-col gap-5"
+      >
+        <div className="flex flex-col gap-2">
+          <span className="app-pill text-[11px] w-fit">Accès sécurisé</span>
+          <h1 className="text-xl font-semibold text-slate-50">
+            Connexion à ton dashboard
+          </h1>
+          <p className="text-xs text-slate-400">
+            Utilise cette page comme base pour brancher ton système
+            d&apos;authentification (JWT, sessions, etc.).
+          </p>
+        </div>
+
+        <form className="flex flex-col gap-4 text-xs">
+          <div className="flex flex-col gap-1">
+            <label className="text-slate-300">Adresse e-mail</label>
+            <input
+              type="email"
+              placeholder="toi@exemple.com"
+              className="rounded-xl border border-slate-700/80 bg-slate-900/70 px-3 py-2 text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-brand-primary/80"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-slate-300">Mot de passe</label>
+            <input
+              type="password"
+              placeholder="••••••••"
+              className="rounded-xl border border-slate-700/80 bg-slate-900/70 px-3 py-2 text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-brand-primary/80"
+            />
+          </div>
+
+          <button
+            type="submit"
+            className="mt-1 inline-flex items-center justify-center rounded-xl bg-brand-primary px-4 py-2 text-xs font-semibold text-slate-50 shadow-soft hover:bg-brand-primary/90"
+          >
+            Se connecter
+          </button>
+
+          <p className="text-[11px] text-slate-500 mt-1">
+            Astuce: branche ce formulaire à ton endpoint /auth/login
+            généré côté backend par CODEFLOW-AI.
+          </p>
+        </form>
+      </div>
+    </div>
+  );
+}
+`.trim(),
+  });
+
+  // Page 404 / Not Found
+  files.push({
+    path: 'src/pages/NotFoundPage.jsx',
+    content: `
+import { Link } from 'react-router-dom';
+import { useGsapFadeIn } from '../hooks/useGsapFadeIn';
+
+export function NotFoundPage() {
+  const ref = useGsapFadeIn({ delay: 0.05 });
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-950 px-4">
+      <div
+        ref={ref}
+        className="app-glass max-w-lg w-full rounded-3xl px-6 py-7 flex flex-col gap-4 items-center text-center"
+      >
+        <span className="app-pill text-[11px]">Erreur 404</span>
+        <h1 className="text-2xl font-semibold text-slate-50">
+          Page introuvable
+        </h1>
+        <p className="text-xs md:text-sm text-slate-400 max-w-sm">
+          Cette route n&apos;a pas encore été configurée dans le frontend
+          généré. Tu peux soit l&apos;ajouter dans App.jsx, soit rediriger
+          l&apos;utilisateur vers le dashboard principal.
+        </p>
+        <Link
+          to="/"
+          className="inline-flex items-center justify-center rounded-xl bg-brand-primary px-4 py-2 text-xs font-semibold text-slate-50 shadow-soft hover:bg-brand-primary/90"
+        >
+          Retour au dashboard
+        </Link>
+      </div>
+    </div>
+  );
+}
+`.trim(),
+  });
+
   // 10) App.jsx qui branche tout ça (layout + routes)
   files.push({
     path: 'src/App.jsx',
@@ -1616,6 +1835,9 @@ import { Topbar } from './components/layout/Topbar';
 import { HomePage } from './pages/HomePage';
 import { ProjectsPage } from './pages/ProjectsPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { LoginPage } from './pages/LoginPage';
+import { NotFoundPage } from './pages/NotFoundPage';
+import { Preview as UiBuilderPreview } from './ui-builder/Preview';
 
 export default function App() {
   return (
@@ -1630,6 +1852,11 @@ export default function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/projects" element={<ProjectsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          {/* Route spéciale pour le mode UI Builder */}
+          <Route path="/__ui-builder" element={<UiBuilderPreview />} />
+          {/* Catch-all */}
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </div>
     </AppLayout>

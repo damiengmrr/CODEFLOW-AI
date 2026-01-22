@@ -1024,7 +1024,51 @@ export default function ${compName}() {
 }
 `;
     } else {
-      pageContent = `export default function ${compName}() {
+      const kind = (p.kind || "").toLowerCase();
+      const isProjectsPage =
+        kind === "app" && /projet/i.test(p.name || p.title || "");
+      const isSettingsPage = kind === "settings";
+
+      if (isProjectsPage) {
+        // Page type "Projets" : filtres + tableau de projets
+        pageContent = `import { useState } from "react";
+
+export default function ${compName}() {
+  const [statusFilter, setStatusFilter] = useState("Tous");
+  const [ownerFilter, setOwnerFilter] = useState("Tous");
+
+  const projects = [
+    {
+      name: "Plateforme SaaS interne",
+      status: "En cours",
+      progress: "68%",
+      owner: "Naël",
+      dueDate: "30/11/2025",
+    },
+    {
+      name: "Refonte site vitrine",
+      status: "À venir",
+      progress: "0%",
+      owner: "Léa",
+      dueDate: "15/01/2026",
+    },
+    {
+      name: "Campagne marketing Q1",
+      status: "Terminé",
+      progress: "100%",
+      owner: "Équipe",
+      dueDate: "01/03/2025",
+    },
+  ];
+
+  const filteredProjects = projects.filter((project) => {
+    const matchStatus =
+      statusFilter === "Tous" || project.status === statusFilter;
+    const matchOwner =
+      ownerFilter === "Tous" || project.owner === ownerFilter;
+    return matchStatus && matchOwner;
+  });
+
   return (
     <section className="space-y-8">
       <header className="space-y-3">
@@ -1035,15 +1079,326 @@ export default function ${compName}() {
           ${description}
         </p>
       </header>
-      <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-        <p className="text-xs text-slate-300">
-          Remplace ce contenu par tes composants, formulaires ou graphiques.
-        </p>
+
+      <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4 flex flex-col md:flex-row md:items-end gap-4">
+        <div className="flex-1 space-y-2">
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+            Filtres
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label className="text-xs text-slate-300">Statut</label>
+              <select
+                className="w-full rounded-md bg-slate-900 border border-slate-700 px-3 py-2 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-primary"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <option>Tous</option>
+                <option>En cours</option>
+                <option>À venir</option>
+                <option>Terminé</option>
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-slate-300">Responsable</label>
+              <select
+                className="w-full rounded-md bg-slate-900 border border-slate-700 px-3 py-2 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-primary"
+                value={ownerFilter}
+                onChange={(e) => setOwnerFilter(e.target.value)}
+              >
+                <option>Tous</option>
+                <option>Moi</option>
+                <option>Naël</option>
+                <option>Léa</option>
+                <option>Équipe</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <button className="inline-flex items-center justify-center rounded-md bg-brand-primary px-4 py-2 text-xs font-medium text-white shadow hover:-translate-y-0.5 hover:shadow-lg transition-all">
+          + Nouveau projet
+        </button>
+      </div>
+
+      <div className="rounded-xl border border-slate-800 bg-slate-900/70 overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800">
+          <p className="text-xs font-medium text-slate-200">Liste des projets</p>
+          <p className="text-[11px] text-slate-400">
+            {filteredProjects.length} projet(s) affiché(s)
+          </p>
+        </div>
+        <div className="relative w-full overflow-x-auto">
+          <table className="w-full text-left text-xs text-slate-300">
+            <thead className="bg-slate-900/80 border-b border-slate-800">
+              <tr>
+                <th className="px-4 py-2 font-medium">Nom</th>
+                <th className="px-4 py-2 font-medium">Statut</th>
+                <th className="px-4 py-2 font-medium">Avancement</th>
+                <th className="px-4 py-2 font-medium">Responsable</th>
+                <th className="px-4 py-2 font-medium">Échéance</th>
+                <th className="px-4 py-2 font-medium text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredProjects.map((project) => (
+                <tr
+                  key={project.name}
+                  className="border-b border-slate-800/80 last:border-0 hover:bg-slate-900/60 transition-colors"
+                >
+                  <td className="px-4 py-2 text-slate-100">{project.name}</td>
+                  <td className="px-4 py-2">
+                    <span className="inline-flex items-center rounded-full bg-slate-800 px-2 py-1 text-[10px] font-medium text-slate-100">
+                      {project.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2">
+                    <div className="flex items-center gap-2">
+                      <div className="h-1.5 w-24 rounded-full bg-slate-800 overflow-hidden">
+                        <div
+                          className="h-full bg-brand-primary"
+                          style={{ width: project.progress }}
+                        />
+                      </div>
+                      <span className="text-[11px] text-slate-300">
+                        {project.progress}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-2 text-slate-200">{project.owner}</td>
+                  <td className="px-4 py-2 text-slate-300">{project.dueDate}</td>
+                  <td className="px-4 py-2 text-right">
+                    <button className="text-[11px] text-slate-300 hover:text-slate-50 mr-2">
+                      Voir
+                    </button>
+                    <button className="text-[11px] text-slate-300 hover:text-slate-50 mr-2">
+                      Éditer
+                    </button>
+                    <button className="text-[11px] text-rose-400 hover:text-rose-300">
+                      Supprimer
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
   );
 }
 `;
+      } else if (isSettingsPage) {
+        // Page type "Paramètres" : profil + notifications
+        pageContent = `import { useState } from "react";
+
+export default function ${compName}() {
+  const [profile, setProfile] = useState({
+    name: "Damien Gamarra",
+    email: "you@example.com",
+    role: "Administrateur",
+  });
+
+  const [settings, setSettings] = useState({
+    emailNotifs: true,
+    pushNotifs: false,
+    weeklyReport: true,
+  });
+
+  function handleProfileChange(e) {
+    const { name, value } = e.target;
+    setProfile((prev) => ({ ...prev, [name]: value }));
+  }
+
+  function handleToggle(name) {
+    setSettings((prev) => ({ ...prev, [name]: !prev[name] }));
+  }
+
+  function handleSave(e) {
+    e.preventDefault();
+    // Ici tu peux brancher ton backend pour persister les préférences
+    console.log("Profil sauvegardé", profile);
+    console.log("Paramètres sauvegardés", settings);
+  }
+
+  return (
+    <section className="space-y-8">
+      <header className="space-y-3">
+        <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-slate-50">
+          ${title}
+        </h1>
+        <p className="text-sm md:text-base text-slate-300 max-w-2xl">
+          ${description}
+        </p>
+      </header>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <form
+          onSubmit={handleSave}
+          className="md:col-span-2 rounded-xl border border-slate-800 bg-slate-900/70 p-4 space-y-4"
+        >
+          <div className="space-y-1">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+              Profil
+            </p>
+            <p className="text-xs text-slate-400">
+              Met à jour ton identité visible dans l’espace d’administration.
+            </p>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="space-y-1">
+              <label className="text-xs text-slate-300" htmlFor="name">
+                Nom complet
+              </label>
+              <input
+                id="name"
+                name="name"
+                className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-primary"
+                value={profile.name}
+                onChange={handleProfileChange}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-slate-300" htmlFor="email">
+                Adresse e-mail
+              </label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-primary"
+                value={profile.email}
+                onChange={handleProfileChange}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-slate-300" htmlFor="role">
+                Rôle
+              </label>
+              <input
+                id="role"
+                name="role"
+                className="w-full rounded-md bg-slate-950 border border-slate-700 px-3 py-2 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-primary"
+                value={profile.role}
+                onChange={handleProfileChange}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              className="inline-flex items-center justify-center rounded-md bg-brand-primary px-4 py-2 text-xs font-medium text-white shadow hover:-translate-y-0.5 hover:shadow-lg transition-all"
+            >
+              Sauvegarder les modifications
+            </button>
+          </div>
+        </form>
+
+        <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4 space-y-3">
+          <div className="space-y-1">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+              Notifications
+            </p>
+            <p className="text-xs text-slate-400">
+              Choisis comment et quand tu veux être notifié.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={() => handleToggle("emailNotifs")}
+              className="flex w-full items-center justify-between rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-left text-xs text-slate-100 hover:border-slate-500"
+            >
+              <span>Notifications par e-mail</span>
+              <span
+                className={
+                  "inline-flex h-4 w-7 items-center rounded-full border text-[10px] " +
+                  (settings.emailNotifs
+                    ? "border-emerald-400 bg-emerald-500/20 justify-end"
+                    : "border-slate-600 bg-slate-800 justify-start")
+                }
+              >
+                <span className="h-3 w-3 rounded-full bg-white" />
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleToggle("pushNotifs")}
+              className="flex w-full items-center justify-between rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-left text-xs text-slate-100 hover:border-slate-500"
+            >
+              <span>Notifications push</span>
+              <span
+                className={
+                  "inline-flex h-4 w-7 items-center rounded-full border text-[10px] " +
+                  (settings.pushNotifs
+                    ? "border-emerald-400 bg-emerald-500/20 justify-end"
+                    : "border-slate-600 bg-slate-800 justify-start")
+                }
+              >
+                <span className="h-3 w-3 rounded-full bg-white" />
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleToggle("weeklyReport")}
+              className="flex w-full items-center justify-between rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-left text-xs text-slate-100 hover:border-slate-500"
+            >
+              <span>Rapport hebdomadaire par e-mail</span>
+              <span
+                className={
+                  "inline-flex h-4 w-7 items-center rounded-full border text-[10px] " +
+                  (settings.weeklyReport
+                    ? "border-emerald-400 bg-emerald-500/20 justify-end"
+                    : "border-slate-600 bg-slate-800 justify-start")
+                }
+              >
+                <span className="h-3 w-3 rounded-full bg-white" />
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+`;
+      } else {
+        // Page générique mais avec mise en page complète (liste / contenu principal)
+        pageContent = `export default function ${compName}() {
+  return (
+    <section className="space-y-8">
+      <header className="space-y-3">
+        <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-slate-50">
+          ${title}
+        </h1>
+        <p className="text-sm md:text-base text-slate-300 max-w-2xl">
+          ${description}
+        </p>
+      </header>
+      <div className="grid gap-4 md:grid-cols-3">
+        <div className="md:col-span-2 rounded-xl border border-slate-800 bg-slate-900/70 p-4 space-y-2">
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+            Vue principale
+          </p>
+          <p className="text-xs text-slate-300">
+            Utilise cette zone pour afficher tes données métier principales (tableaux, graphiques, formulaires...).
+          </p>
+        </div>
+        <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4 space-y-2">
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+            Notes & raccourcis
+          </p>
+          <ul className="space-y-1 text-xs text-slate-300">
+            <li>– Ajoute ici des raccourcis vers les actions importantes.</li>
+            <li>– Affiche un résumé ou une TODO list rapide.</li>
+            <li>– Connecte cette page à ton backend.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+  );
+}
+`;
+      }
     }
     files.push({
       path: `src/pages/${compName}.jsx`,

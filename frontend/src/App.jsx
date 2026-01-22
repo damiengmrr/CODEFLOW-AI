@@ -115,7 +115,8 @@ function App() {
         id: Date.now(),
         createdAt: new Date().toLocaleTimeString(),
         prompt,
-        mode,
+        backendMode: mode,
+        generatorMode,
         plan: data.plan || null,
         files: data.files || [],
       };
@@ -140,7 +141,7 @@ function App() {
       const response = await fetch("http://localhost:4000/api/generate/zip", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({ prompt, mode: generatorMode }),
       });
 
       if (!response.ok) {
@@ -178,8 +179,21 @@ function App() {
 
   const handleLoadFromHistory = (entry) => {
     setPrompt(entry.prompt);
-    if (entry.backendMode) setMode(entry.backendMode);
-    if (entry.generatorMode) setGeneratorMode(entry.generatorMode);
+
+    // Restaurer les modes (compatibilité ancienne structure d'historique)
+    if (entry.backendMode) {
+      setMode(entry.backendMode);
+    } else if (entry.mode && ["backend-simple", "full-project", "auto-dev"].includes(entry.mode)) {
+      setMode(entry.mode);
+    }
+
+    if (entry.generatorMode) {
+      setGeneratorMode(entry.generatorMode);
+    } else {
+      // Par défaut, on considère backend si rien n'est stocké
+      setGeneratorMode("backend");
+    }
+
     setResult({ plan: entry.plan, files: entry.files });
     setSelectedFilePath(entry.files?.[0]?.path || "");
     setEditedFiles({});
@@ -292,7 +306,7 @@ function App() {
   const handleAiEdit = async () => {
     if (!result || !files.length) {
       setError(
-        "Aucun backend généré pour le moment. Commence par générer un projet."
+        "Aucun projet généré pour le moment. Commence par générer un backend ou un frontend."
       );
       return;
     }
@@ -369,6 +383,18 @@ function App() {
     }
   };
 
+  // --- Detect editor language based on file extension
+  const getLanguageForFile = (path) => {
+    if (!path) return "javascript";
+    const lower = path.toLowerCase();
+    if (lower.endsWith(".json")) return "json";
+    if (lower.endsWith(".md")) return "markdown";
+    if (lower.endsWith(".html")) return "html";
+    if (lower.endsWith(".css")) return "css";
+    if (lower.endsWith(".ts") || lower.endsWith(".tsx")) return "typescript";
+    return "javascript";
+  };
+
   const currentFile = getCurrentFile();
   const currentContent = currentFile
     ? editedFiles[currentFile.path] ?? currentFile.content
@@ -376,9 +402,11 @@ function App() {
 
   const planSummary =
     plan &&
-    `${plan.entities?.length || 0} entités · ${
-      plan.routes?.length || 0
-    } groupes de routes · ${files.length} fichiers`;
+    (generatorMode === "frontend"
+      ? `${plan.pages?.length || 0} pages · ${files.length} fichiers`
+      : `${plan.entities?.length || 0} entités · ${
+          plan.routes?.length || 0
+        } groupes de routes · ${files.length} fichiers`);
 
   // 🧩 Composant de zone de chat (utilisé avant résultat + en bas de l'UI VSCode)
   const renderChatInput = ({ compact = false } = {}) => (
@@ -912,7 +940,13 @@ function App() {
                           gap: "0.3rem",
                         }}
                       >
-                        <span style={{ opacity: 0.8 }}>{entry.mode}</span>
+                        <span style={{ opacity: 0.8 }}>
+                          {entry.generatorMode === "frontend"
+                            ? "Frontend"
+                            : entry.generatorMode === "backend"
+                            ? `Backend${entry.backendMode ? " · " + entry.backendMode : ""}`
+                            : entry.mode || "Backend"}
+                        </span>
                         <span
                           style={{
                             fontSize: "0.7rem",
@@ -1069,84 +1103,86 @@ function App() {
                 </button>
               </div>
 
-              <div
-                style={{
-                  padding: "0.45rem 0.65rem",
-                  borderBottom: `1px solid ${theme.border}`,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "0.3rem",
-                }}
-              >
-                <div style={{ display: "flex", gap: "0.35rem" }}>
-                  <button
-                    type="button"
-                    onClick={() => handleModeChange("backend-simple")}
-                    style={{
-                      flex: 1,
-                      padding: "0.25rem 0.3rem",
-                      borderRadius: 4,
-                      border:
-                        mode === "backend-simple"
-                          ? `1px solid ${theme.accent}`
-                          : `1px solid ${theme.border}`,
-                      background:
-                        mode === "backend-simple"
-                          ? "rgba(0,122,204,0.3)"
-                          : "transparent",
-                      color: "#e5e7eb",
-                      fontSize: "0.72rem",
-                      cursor: "pointer",
-                    }}
-                  >
-                    Backend simple
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleModeChange("full-project")}
-                    style={{
-                      flex: 1,
-                      padding: "0.25rem 0.3rem",
-                      borderRadius: 4,
-                      border:
-                        mode === "full-project"
-                          ? `1px solid ${theme.accent}`
-                          : `1px solid ${theme.border}`,
-                      background:
-                        mode === "full-project"
-                          ? "rgba(0,122,204,0.3)"
-                          : "transparent",
-                      color: "#e5e7eb",
-                      fontSize: "0.72rem",
-                      cursor: "pointer",
-                    }}
-                  >
-                    Projet complet
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleModeChange("auto-dev")}
+              {generatorMode === "backend" && (
+                <div
                   style={{
-                    padding: "0.25rem 0.3rem",
-                    borderRadius: 4,
-                    border:
-                      mode === "auto-dev"
-                        ? `1px solid ${theme.accent}`
-                        : `1px solid ${theme.border}`,
-                    background:
-                      mode === "auto-dev"
-                        ? "rgba(0,122,204,0.3)"
-                        : "transparent",
-                    color: "#e5e7eb",
-                    fontSize: "0.72rem",
-                    cursor: "pointer",
-                    textAlign: "left",
+                    padding: "0.45rem 0.65rem",
+                    borderBottom: `1px solid ${theme.border}`,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.3rem",
                   }}
                 >
-                  Mode auto-dev
-                </button>
-              </div>
+                  <div style={{ display: "flex", gap: "0.35rem" }}>
+                    <button
+                      type="button"
+                      onClick={() => handleModeChange("backend-simple")}
+                      style={{
+                        flex: 1,
+                        padding: "0.25rem 0.3rem",
+                        borderRadius: 4,
+                        border:
+                          mode === "backend-simple"
+                            ? `1px solid ${theme.accent}`
+                            : `1px solid ${theme.border}`,
+                        background:
+                          mode === "backend-simple"
+                            ? "rgba(0,122,204,0.3)"
+                            : "transparent",
+                        color: "#e5e7eb",
+                        fontSize: "0.72rem",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Backend simple
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleModeChange("full-project")}
+                      style={{
+                        flex: 1,
+                        padding: "0.25rem 0.3rem",
+                        borderRadius: 4,
+                        border:
+                          mode === "full-project"
+                            ? `1px solid ${theme.accent}`
+                            : `1px solid ${theme.border}`,
+                        background:
+                          mode === "full-project"
+                            ? "rgba(0,122,204,0.3)"
+                            : "transparent",
+                        color: "#e5e7eb",
+                        fontSize: "0.72rem",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Projet complet
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleModeChange("auto-dev")}
+                    style={{
+                      padding: "0.25rem 0.3rem",
+                      borderRadius: 4,
+                      border:
+                        mode === "auto-dev"
+                          ? `1px solid ${theme.accent}`
+                          : `1px solid ${theme.border}`,
+                      background:
+                        mode === "auto-dev"
+                          ? "rgba(0,122,204,0.3)"
+                          : "transparent",
+                      color: "#e5e7eb",
+                      fontSize: "0.72rem",
+                      cursor: "pointer",
+                      textAlign: "left",
+                    }}
+                  >
+                    Mode auto-dev
+                  </button>
+                </div>
+              )}
 
               <div
                 style={{
@@ -1489,7 +1525,7 @@ function App() {
                         height="100%"
                         width="100%"
                         theme="vs-dark"
-                        defaultLanguage="javascript"
+                        language={getLanguageForFile(currentFile.path)}
                         value={currentContent}
                         onChange={(value) =>
                           setEditedFiles((prev) => ({
@@ -1608,6 +1644,100 @@ function App() {
                             : "Glisser-déposer bientôt dispo (concept UI)"}
                         </span>
                       </div>
+
+                      {plan && Array.isArray(plan.pages) && plan.pages.length > 0 && (
+                        <div
+                          style={{
+                            padding: "0.65rem 0.85rem 0.45rem",
+                            borderBottom: `1px solid ${theme.border}`,
+                            background:
+                              "linear-gradient(135deg,rgba(15,23,42,0.95),rgba(37,99,235,0.85))",
+                            boxShadow:
+                              "0 10px 25px rgba(15,23,42,0.85), 0 0 0 1px rgba(30,64,175,0.4)",
+                            fontSize: "0.8rem",
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              gap: "0.4rem",
+                              marginBottom: "0.35rem",
+                            }}
+                          >
+                            <div>
+                              <div
+                                style={{
+                                  fontSize: "0.75rem",
+                                  textTransform: "uppercase",
+                                  letterSpacing: "0.12em",
+                                  opacity: 0.8,
+                                }}
+                              >
+                                Structure frontend générée
+                              </div>
+                              <div style={{ fontWeight: 600 }}>
+                                {plan.description || "Frontend généré"}
+                              </div>
+                            </div>
+                            <div
+                              style={{
+                                fontSize: "0.72rem",
+                                padding: "0.2rem 0.55rem",
+                                borderRadius: 999,
+                                background: "rgba(15,23,42,0.9)",
+                                border: "1px solid rgba(148,163,184,0.6)",
+                              }}
+                            >
+                              {plan.pages.length} page(s)
+                            </div>
+                          </div>
+
+                          <div
+                            style={{
+                              display: "flex",
+                              flexWrap: "wrap",
+                              gap: "0.35rem",
+                            }}
+                          >
+                            {plan.pages.map((p) => (
+                              <span
+                                key={p.path}
+                                style={{
+                                  fontSize: "0.72rem",
+                                  padding: "0.2rem 0.55rem",
+                                  borderRadius: 999,
+                                  background: "rgba(15,23,42,0.9)",
+                                  border: "1px solid rgba(148,163,184,0.5)",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "0.3rem",
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    width: 8,
+                                    height: 8,
+                                    borderRadius: "999px",
+                                    background: "#22c55e",
+                                  }}
+                                />
+                                <span>{p.name}</span>
+                                <span
+                                  style={{
+                                    opacity: 0.7,
+                                    fontFamily:
+                                      "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
+                                  }}
+                                >
+                                  {p.path}
+                                </span>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
 
                       <div
                         style={{
