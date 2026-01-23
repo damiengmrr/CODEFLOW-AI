@@ -9,7 +9,7 @@ Si tu découvres un comportement anormal, une faille ou un risque potentiel :
 
 1. **Ne publie jamais la vulnérabilité publiquement.**
 2. Contacte directement :  
-   **contact : damien.gamarra.pro@gmail.com** (ou l’adresse souhaitée).
+   **contact : damien.gamarra.pro@gmail.com** .
 3. Fournis les détails suivants :
    - Description du problème
    - Étapes pour reproduire
