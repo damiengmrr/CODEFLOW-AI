@@ -1,5 +1,5 @@
 import Editor from "@monaco-editor/react";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const theme = {
   bodyBg: "#0b0f19",
@@ -48,10 +48,85 @@ function App() {
   const [aiEditing, setAiEditing] = useState(false);
   const [aiEditMessage, setAiEditMessage] = useState("");
   const [uiRightTab, setUiRightTab] = useState("preview");
+  // --- Live Preview (Vite) state
+  const [previewStatus, setPreviewStatus] = useState("idle"); // idle | starting | running | error
+  const [previewUrl, setPreviewUrl] = useState("");
+  const [previewError, setPreviewError] = useState("");
+  const [previewReloadKey, setPreviewReloadKey] = useState(0);
 
   const hasResult = !!result;
   const plan = result?.plan;
   const files = result?.files || [];
+
+  // --- Preview API helpers (backend: /api/preview/frontend)
+  const buildPreviewFilesPayload = (inputFiles) =>
+    (inputFiles || []).map((f) => ({
+      path: f.path,
+      content: editedFiles[f.path] ?? f.content,
+    }));
+
+  const fetchPreviewStatus = async () => {
+    try {
+      const res = await fetch("http://localhost:4000/api/preview/frontend", {
+        method: "GET",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return { status: "error", error: data?.error || "Impossible de récupérer le statut de la preview" };
+      }
+      return data;
+    } catch (e) {
+      return { status: "error", error: e?.message || "Erreur réseau pendant le statut preview" };
+    }
+  };
+
+  const launchPreview = async (inputFiles) => {
+    setPreviewError("");
+    setPreviewStatus("starting");
+
+    try {
+      const res = await fetch("http://localhost:4000/api/preview/frontend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ files: buildPreviewFilesPayload(inputFiles) }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.error || "Erreur lors du lancement de la preview");
+      }
+
+      // Support multiple response shapes
+      const url = data?.url || (data?.port ? `http://localhost:${data.port}` : "http://localhost:5174");
+      setPreviewUrl(url);
+      setPreviewStatus(data?.status || "running");
+      setPreviewReloadKey((k) => k + 1);
+      return data;
+    } catch (e) {
+      setPreviewStatus("error");
+      setPreviewError(e?.message || "Erreur inconnue pendant le lancement de la preview");
+      return null;
+    }
+  };
+
+  const stopPreview = async () => {
+    setPreviewError("");
+    try {
+      const res = await fetch("http://localhost:4000/api/preview/frontend", {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.error || "Erreur lors de l'arrêt de la preview");
+      }
+      setPreviewStatus("idle");
+      setPreviewUrl("");
+      return data;
+    } catch (e) {
+      setPreviewStatus("error");
+      setPreviewError(e?.message || "Erreur inconnue pendant l'arrêt de la preview");
+      return null;
+    }
+  };
 
   // 🔁 Helpers
   const handleModeChange = (newMode) => {
@@ -111,6 +186,11 @@ function App() {
       }
 
       setResult(data);
+      // Auto-start Live Preview for frontend projects
+      if (generatorMode === "frontend" && Array.isArray(data.files) && data.files.length > 0) {
+        // Fire and forget (do not block UI)
+        launchPreview(data.files);
+      }
       const entry = {
         id: Date.now(),
         createdAt: new Date().toLocaleTimeString(),
@@ -197,6 +277,9 @@ function App() {
     setResult({ plan: entry.plan, files: entry.files });
     setSelectedFilePath(entry.files?.[0]?.path || "");
     setEditedFiles({});
+    setPreviewStatus("idle");
+    setPreviewUrl("");
+    setPreviewError("");
     setError("");
     setShowRawResult(false);
     setCopyMessage("");
@@ -686,6 +769,45 @@ function App() {
   };
 
   const recentHistory = history.slice(0, 6);
+
+  // Poll preview status while running/starting
+  useEffect(() => {
+    if (generatorMode !== "frontend") return;
+
+    let cancelled = false;
+    let t;
+
+    const tick = async () => {
+      const s = await fetchPreviewStatus();
+      if (cancelled) return;
+
+      const normalizedStatus = s?.status || s?.state?.status || (s?.running ? "running" : "idle");
+      const url = s?.url || s?.state?.url || (s?.port ? `http://localhost:${s.port}` : "");
+
+      if (normalizedStatus === "error") {
+        setPreviewStatus("error");
+        setPreviewError(s?.error || "Erreur preview");
+      } else if (normalizedStatus === "running" || normalizedStatus === "starting" || normalizedStatus === "idle") {
+        setPreviewStatus(normalizedStatus);
+        if (url) setPreviewUrl(url);
+      }
+
+      // Keep polling only when frontend mode is active
+      t = window.setTimeout(tick, 1200);
+    };
+
+    tick();
+
+    return () => {
+      cancelled = true;
+      if (t) window.clearTimeout(t);
+    };
+  }, [generatorMode]);
+
+  const previewAddress = useMemo(() => {
+    if (previewUrl) return previewUrl;
+    return "http://localhost:5174";
+  }, [previewUrl]);
 
   return (
     <div
@@ -1633,16 +1755,72 @@ function App() {
                             UI Builder (beta)
                           </button>
                         </div>
-                        <span
-                          style={{
-                            opacity: 0.75,
-                            fontSize: "0.72rem",
-                          }}
-                        >
-                          {uiRightTab === "preview"
-                            ? "Rendu de index.html généré par l’IA"
-                            : "Glisser-déposer bientôt dispo (concept UI)"}
-                        </span>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                          <span
+                            style={{
+                              opacity: 0.75,
+                              fontSize: "0.72rem",
+                            }}
+                          >
+                            {uiRightTab === "preview"
+                              ? `Live Preview: ${previewStatus}${previewStatus === "running" ? " ✅" : previewStatus === "starting" ? " ⏳" : previewStatus === "error" ? " ❌" : ""}`
+                              : "Glisser-déposer bientôt dispo (concept UI)"}
+                          </span>
+
+                          {uiRightTab === "preview" && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => launchPreview(files)}
+                                disabled={previewStatus === "starting"}
+                                style={{
+                                  padding: "0.22rem 0.6rem",
+                                  borderRadius: 999,
+                                  border: `1px solid ${theme.border}`,
+                                  background: "rgba(15,23,42,0.9)",
+                                  color: "#e5e7eb",
+                                  cursor: previewStatus === "starting" ? "default" : "pointer",
+                                  fontSize: "0.72rem",
+                                }}
+                                title="Démarrer / relancer la preview"
+                              >
+                                {previewStatus === "starting" ? "Démarrage..." : "Lancer"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setPreviewReloadKey((k) => k + 1)}
+                                style={{
+                                  padding: "0.22rem 0.6rem",
+                                  borderRadius: 999,
+                                  border: `1px solid ${theme.border}`,
+                                  background: "rgba(15,23,42,0.9)",
+                                  color: "#e5e7eb",
+                                  cursor: "pointer",
+                                  fontSize: "0.72rem",
+                                }}
+                                title="Rafraîchir l'iframe"
+                              >
+                                Reload
+                              </button>
+                              <button
+                                type="button"
+                                onClick={stopPreview}
+                                style={{
+                                  padding: "0.22rem 0.6rem",
+                                  borderRadius: 999,
+                                  border: `1px solid rgba(248,113,113,0.65)`,
+                                  background: "rgba(127,29,29,0.35)",
+                                  color: "#fecaca",
+                                  cursor: "pointer",
+                                  fontSize: "0.72rem",
+                                }}
+                                title="Arrêter la preview"
+                              >
+                                Stop
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </div>
 
                       {plan && Array.isArray(plan.pages) && plan.pages.length > 0 && (
@@ -1913,21 +2091,85 @@ function App() {
                                         textOverflow: "ellipsis",
                                       }}
                                     >
-                                      http://localhost:5173
+                                      {previewAddress}
                                     </span>
                                   </div>
                                 </div>
 
-                                {/* Actual iframe */}
+                                {/* Actual iframe (Live Vite preview) */}
                                 <div
                                   style={{
                                     flex: 1,
                                     background: "#111827",
+                                    position: "relative",
                                   }}
                                 >
+                                  {previewStatus !== "running" ? (
+                                    <div
+                                      style={{
+                                        position: "absolute",
+                                        inset: 0,
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        padding: 18,
+                                        boxSizing: "border-box",
+                                        color: "#cbd5e1",
+                                        textAlign: "center",
+                                        background: "radial-gradient(circle at top,#020617,#020617 55%,#000 100%)",
+                                      }}
+                                    >
+                                      <div style={{ maxWidth: 520 }}>
+                                        <div
+                                          style={{
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            gap: 8,
+                                            padding: "4px 10px",
+                                            borderRadius: 999,
+                                            border: "1px solid rgba(148,163,184,0.35)",
+                                            background: "rgba(15,23,42,0.85)",
+                                            marginBottom: 10,
+                                            fontSize: 12,
+                                          }}
+                                        >
+                                          <span
+                                            style={{
+                                              width: 8,
+                                              height: 8,
+                                              borderRadius: 999,
+                                              background:
+                                                previewStatus === "starting"
+                                                  ? "#facc15"
+                                                  : previewStatus === "error"
+                                                  ? "#f97373"
+                                                  : "#94a3b8",
+                                            }}
+                                          />
+                                          <span>
+                                            {previewStatus === "starting"
+                                              ? "Preview en cours de démarrage…"
+                                              : previewStatus === "error"
+                                              ? "Preview en erreur"
+                                              : "Preview arrêtée"}
+                                          </span>
+                                        </div>
+                                        <p style={{ margin: 0, fontSize: 13, opacity: 0.9 }}>
+                                          Clique sur <strong>Lancer</strong> pour démarrer la preview Vite et voir le vrai rendu React.
+                                        </p>
+                                        {previewError && (
+                                          <p style={{ margin: "10px 0 0", fontSize: 12, color: "#fca5a5" }}>
+                                            {previewError}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ) : null}
+
                                   <iframe
+                                    key={previewReloadKey}
                                     title="preview"
-                                    srcDoc={srcDoc}
+                                    src={previewAddress}
                                     style={{
                                       width: "100%",
                                       height: "100%",

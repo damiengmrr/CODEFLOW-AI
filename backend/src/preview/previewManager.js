@@ -3,12 +3,29 @@ import fs from "fs/promises";
 import fsSync from "fs";
 import path from "path";
 import { spawn } from "child_process";
-import os from "os";
+import net from "net";
 
-const PREVIEW_PORT = parseInt(
+let PREVIEW_PORT = parseInt(
   process.env.PREVIEW_PORT || process.env.CODEFLOW_PREVIEW_PORT || "5174",
   10
 );
+
+async function findAvailablePort(startPort) {
+  let port = startPort;
+  while (true) {
+    const isFree = await new Promise((resolve) => {
+      const tester = net
+        .createServer()
+        .once("error", () => resolve(false))
+        .once("listening", () =>
+          tester.once("close", () => resolve(true)).close()
+        )
+        .listen(port);
+    });
+    if (isFree) return port;
+    port++;
+  }
+}
 
 let currentPreview = {
   status: "idle", // idle | starting | ready | error | stopped
@@ -25,10 +42,20 @@ const previewRoot = path.join(process.cwd(), ".preview-frontend");
  * Écrit les fichiers générés par l'IA dans le dossier de preview
  */
 async function writeFilesToPreviewDir(files) {
-  // On repart de zéro à chaque fois
-  await fs.rm(previewRoot, { recursive: true, force: true });
+  // Ne pas supprimer le dossier complet sinon ça efface node_modules.
+  // On conserve node_modules pour éviter de refaire npm install à chaque génération.
   await fs.mkdir(previewRoot, { recursive: true });
 
+  // Nettoie tout sauf node_modules
+  const entries = await fs.readdir(previewRoot).catch(() => []);
+  await Promise.all(
+    entries.map(async (name) => {
+      if (name === "node_modules") return;
+      await fs.rm(path.join(previewRoot, name), { recursive: true, force: true });
+    })
+  );
+
+  // Écrit/écrase les fichiers générés
   for (const file of files) {
     const filePath = path.join(previewRoot, file.path);
     const dir = path.dirname(filePath);
@@ -42,22 +69,38 @@ async function writeFilesToPreviewDir(files) {
  * On suppose que package.json + config Vite sont déjà dans les fichiers
  * (ce que ton générateur frontend produit).
  */
-function startViteDevServer() {
+async function startViteDevServer() {
+  PREVIEW_PORT = await findAvailablePort(PREVIEW_PORT);
+  console.log(`[previewManager] Using port ${PREVIEW_PORT} for preview`);
+  console.log(`[previewManager] Preview root directory: ${previewRoot}`);
+
   if (currentPreview.process && (currentPreview.status === "starting" || currentPreview.status === "ready")) {
-    console.log("[preview] Vite dev server already running, reusing existing process");
+    console.log("[previewManager] Vite dev server already running, reusing existing process");
     currentPreview.url = `http://localhost:${PREVIEW_PORT}`;
     return;
   }
 
   if (currentPreview.process) {
     try {
-      currentPreview.process.kill("SIGTERM");
+      if (currentPreview.process.pid) {
+        currentPreview.process.kill("SIGTERM");
+        // fallback kill after short delay if still running (for macOS/Linux)
+        setTimeout(() => {
+          try {
+            if (currentPreview.process && !currentPreview.process.killed) {
+              currentPreview.process.kill("SIGKILL");
+            }
+          } catch {
+            // ignore
+          }
+        }, 5000);
+      }
     } catch {
       // ignore
     }
   }
 
-  console.log("[preview] Starting frontend preview server...");
+  console.log("[previewManager] Starting frontend preview server...");
   currentPreview.status = "starting";
   currentPreview.error = null;
   currentPreview.url = `http://localhost:${PREVIEW_PORT}`;
@@ -71,7 +114,7 @@ function startViteDevServer() {
   const runNpmInstallIfNeeded = () =>
     new Promise((resolve, reject) => {
       if (installInProgress) {
-        console.log("[preview] npm install already in progress, waiting...");
+        console.log("[previewManager] npm install already in progress, waiting...");
         const checkInterval = setInterval(() => {
           if (!installInProgress) {
             clearInterval(checkInterval);
@@ -82,7 +125,7 @@ function startViteDevServer() {
       }
 
       if (!npmInstallNeeded) {
-        console.log("[preview] node_modules detected, skipping npm install");
+        console.log("[previewManager] node_modules detected, skipping npm install");
         return resolve();
       }
 
@@ -96,7 +139,7 @@ function startViteDevServer() {
 
       install.on("close", (code) => {
         installInProgress = false;
-        console.log("[preview] npm install finished with code", code);
+        console.log("[previewManager] npm install finished with code", code);
         if (code === 0) resolve();
         else reject(new Error(`npm install exited with code ${code}`));
       });
@@ -119,32 +162,50 @@ function startViteDevServer() {
         }
       );
 
+      currentPreview.process = dev;
+
+      let resolvedReady = false;
+      const readyTimer = setTimeout(() => {
+        if (!resolvedReady && currentPreview.status === "starting") {
+          currentPreview.status = "error";
+          currentPreview.error =
+            "Le serveur Vite n'a pas signalé d'URL de preview (timeout).";
+          try {
+            dev.kill("SIGTERM");
+          } catch {
+            // ignore
+          }
+        }
+      }, 30000);
+
       dev.stdout.on("data", (data) => {
         const text = data.toString();
-        console.log("[preview][vite]", text.trim());
+        console.log("[previewManager][vite]", text.trim());
+
+        // Détection améliorée de la readiness Vite
+        if (!resolvedReady && (text.includes("Local:") || text.includes("http://") || /ready in/i.test(text))) {
+          resolvedReady = true;
+          clearTimeout(readyTimer);
+          currentPreview.status = "ready";
+          currentPreview.url = `http://localhost:${PREVIEW_PORT}`;
+          console.log("[previewManager] Preview is ready and accessible at:", currentPreview.url);
+          resolve();
+        }
       });
 
       dev.stderr.on("data", (data) => {
         const text = data.toString();
-        console.error("[preview][vite:err]", text.trim());
+        console.error("[previewManager][vite:err]", text.trim());
       });
 
-      currentPreview.process = dev;
-
       dev.on("spawn", () => {
-        console.log("[preview] Vite dev server spawned on", currentPreview.url);
-        // On considère la preview "ready" une fois le serveur démarré.
-        currentPreview.status = "ready";
-        setTimeout(() => {
-          if (currentPreview.status === "starting") {
-            console.warn("[preview] Vite did not signal readiness within the expected delay.");
-          }
-        }, 15000);
-        resolve();
+        console.log("[previewManager] Vite dev server spawned on", `http://localhost:${PREVIEW_PORT}`);
+        // On laisse le status en 'starting' jusqu'à détection 'Local:' / 'http://' / 'ready in'
       });
 
       dev.on("close", (code) => {
-        console.log("[preview] Vite dev server exited with code", code);
+        clearTimeout(readyTimer);
+        console.log("[previewManager] Vite dev server exited with code", code);
         if (code !== 0 && currentPreview.status !== "stopped") {
           currentPreview.status = "error";
           currentPreview.error = `Vite s'est arrêté avec le code ${code}`;
@@ -154,6 +215,7 @@ function startViteDevServer() {
       });
 
       dev.on("error", (err) => {
+        clearTimeout(readyTimer);
         currentPreview.status = "error";
         if (err.code === "ENOENT") {
           currentPreview.error =
@@ -172,7 +234,7 @@ function startViteDevServer() {
       await runNpmInstallIfNeeded();
       await runViteDev();
     } catch (err) {
-      console.error("[preview] Erreur lors du démarrage de Vite:", err);
+      console.error("[previewManager] Erreur lors du démarrage de Vite:", err);
       currentPreview.status = "error";
       currentPreview.error =
         err?.message || "Erreur lors du démarrage du serveur Vite.";
@@ -190,19 +252,26 @@ export async function launchFrontendPreview(files = []) {
     );
   }
 
-  console.log("[preview] Launching frontend preview with", files.length, "files");
+  console.log("[previewManager] Launching frontend preview with", files.length, "files");
 
-  currentPreview.status = "starting";
-  currentPreview.error = null;
-  currentPreview.url = null;
+  const wasRunning =
+    !!currentPreview.process &&
+    (currentPreview.status === "starting" || currentPreview.status === "ready");
 
+  // On écrit d'abord les fichiers
   await writeFilesToPreviewDir(files);
 
-  if (currentPreview.process && currentPreview.status === "ready") {
-    console.log("[preview] Reusing existing Vite dev server for new frontend files");
-    currentPreview.url = `http://localhost:${PREVIEW_PORT}`;
+  // Reset error and url only after successful write
+  currentPreview.error = null;
+  currentPreview.url = `http://localhost:${PREVIEW_PORT}`;
+
+  currentPreview.status = "starting";
+
+  // Si le serveur Vite tourne déjà, on ne modifie pas le status 'ready'
+  if (wasRunning) {
+    console.log("[previewManager] Reusing existing Vite dev server for new frontend files");
     return {
-      status: currentPreview.status,
+      status: currentPreview.status === "starting" ? currentPreview.status : "ready",
       url: currentPreview.url,
     };
   }
@@ -230,13 +299,25 @@ export function getFrontendPreviewStatus() {
  * Stoppe le serveur Vite de preview
  */
 export async function stopFrontendPreview() {
-  console.log("[preview] Stopping frontend preview server...");
+  console.log("[previewManager] Stopping frontend preview server...");
   if (currentPreview.process) {
     try {
-      currentPreview.status = "stopped";
-      currentPreview.process.kill("SIGTERM");
+      if (currentPreview.process.pid) {
+        currentPreview.status = "stopped";
+        currentPreview.process.kill("SIGTERM");
+        // fallback kill after short delay if still running (for macOS/Linux)
+        setTimeout(() => {
+          try {
+            if (currentPreview.process && !currentPreview.process.killed) {
+              currentPreview.process.kill("SIGKILL");
+            }
+          } catch {
+            // ignore
+          }
+        }, 5000);
+      }
     } catch (err) {
-      console.error("[preview] Erreur lors de l'arrêt du process:", err);
+      console.error("[previewManager] Erreur lors de l'arrêt du process:", err);
     } finally {
       currentPreview.process = null;
     }
@@ -246,9 +327,15 @@ export async function stopFrontendPreview() {
   currentPreview.error = null;
   installInProgress = false;
 
-  // Optionnel : nettoyage du dossier
+  // Optionnel : nettoyage (on garde node_modules)
   try {
-    await fs.rm(previewRoot, { recursive: true, force: true });
+    const entries = await fs.readdir(previewRoot).catch(() => []);
+    await Promise.all(
+      entries.map(async (name) => {
+        if (name === "node_modules") return;
+        await fs.rm(path.join(previewRoot, name), { recursive: true, force: true });
+      })
+    );
   } catch {
     // ignore
   }
